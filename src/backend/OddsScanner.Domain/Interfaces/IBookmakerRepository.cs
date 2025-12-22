@@ -10,5 +10,6 @@ namespace OddsScanner.Domain.Interfaces
     public interface IBookmakerRepository
     {
         Task AddAsync(Bookmaker bookmaker);
+        Task<Bookmaker?> GetByNameAsync(string name);
     }
 }

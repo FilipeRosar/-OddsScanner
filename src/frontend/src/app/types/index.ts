@@ -2,6 +2,7 @@ export interface Odd {
   bookmakerName: string;
   value: number;
   selection: string; 
+  bookmakerUrl: string;
 }
 
 export interface Match {

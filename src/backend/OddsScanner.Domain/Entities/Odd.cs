@@ -6,11 +6,10 @@ using System.Threading.Tasks;
 
 namespace OddsScanner.Domain.Entities
 {
-    public class Odd
+    public class Odd : BaseEntity
     {
-        public Guid Id { get; private set; }
         public decimal Value { get; private set; } 
-        public string MarketType { get; private set; } 
+        public string MarketName { get; private set; } 
         public string Selection { get; private set; } 
         public DateTime LastUpdated { get; private set; }
 
@@ -20,23 +19,25 @@ namespace OddsScanner.Domain.Entities
         public Guid BookmakerId { get; private set; }
         public Bookmaker Bookmaker { get; private set; }
 
-        public Odd(decimal value, string marketType, string selection, Guid matchId, Guid bookmakerId)
+        public Odd(decimal value, string marketName, string selection, Guid matchId, Guid bookmakerId)
         {
-            Id = Guid.NewGuid();
+            if (value <= 1) throw new ArgumentException("Odd deve ser maior que 1.0");
+
             Value = value;
-            MarketType = marketType;
+            MarketName = marketName;
             Selection = selection;
             MatchId = matchId;
             BookmakerId = bookmakerId;
             LastUpdated = DateTime.UtcNow;
         }
+
         public void UpdateValue(decimal newValue)
         {
-            if (newValue < 1.01m) newValue = 1.01m;
-
-            Value = Math.Round(newValue, 2); 
-            LastUpdated = DateTime.UtcNow;
+            if (Value != newValue)
+            {
+                Value = newValue;
+                LastUpdated = DateTime.UtcNow;
+            }
         }
-        protected Odd() { }
     }
 }

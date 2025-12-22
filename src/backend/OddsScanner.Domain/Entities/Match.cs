@@ -7,9 +7,8 @@ using System.Threading.Tasks;
 
 namespace OddsScanner.Domain.Entities
 {
-    public class Match
+    public class Match : BaseEntity
     {
-        public Guid Id { get; private set; }
         public string HomeTeam { get; private set; }
         public string AwayTeam { get; private set; }
         public DateTime StartTime { get; private set; }
@@ -19,12 +18,12 @@ namespace OddsScanner.Domain.Entities
 
         public Match(string homeTeam, string awayTeam, DateTime startTime, string league)
         {
-            Id = Guid.NewGuid();
             HomeTeam = homeTeam;
             AwayTeam = awayTeam;
             StartTime = startTime;
             League = league;
         }
+        public bool IsLive => DateTime.UtcNow >= StartTime;
         protected Match() { }
     }
 }

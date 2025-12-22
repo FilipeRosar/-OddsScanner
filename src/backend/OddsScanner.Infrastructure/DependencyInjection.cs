@@ -16,7 +16,9 @@ namespace OddsScanner.Infrastructure
             var connectionString = configuration.GetConnectionString("DefaultConnection");
 
             services.AddDbContext<OddsScannerDbContext>(options =>
-                options.UseNpgsql(connectionString));
+            options.UseNpgsql(
+                configuration.GetConnectionString("DefaultConnection"),
+                b => b.MigrationsAssembly(typeof(OddsScannerDbContext).Assembly.FullName)));
 
             services.AddStackExchangeRedisCache(options =>
             {

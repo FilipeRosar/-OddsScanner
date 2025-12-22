@@ -30,9 +30,10 @@ namespace OddsScanner.Infrastructure.Repositories
         public async Task<List<Match>> GetAllAsync()
         {
             return await _context.Matches
-                .Include(m => m.Odds)
-                .ThenInclude(o => o.Bookmaker)
                 .AsNoTracking() 
+                .Include(m => m.Odds)              
+                    .ThenInclude(o => o.Bookmaker)  
+                .OrderBy(m => m.StartTime)
                 .ToListAsync();
         }
         public async Task<List<Match>> GetAllForUpdateAsync()

@@ -23,16 +23,32 @@ namespace OddsScanner.Application.Services
 
         public async Task<List<MatchDto>> GetAllMatchesAsync()
         {
-            const string cacheKey = "matches_all";
+            Console.WriteLine("--- 🔍 INICIANDO DIAGNÓSTICO DA API ---");
 
-            var cachedMatches = await _cacheService.GetAsync<List<MatchDto>>(cacheKey);
-            if (cachedMatches != null)
+            // 1. Busca do Banco
+            var matches = await _unitOfWork.Matches.GetAllAsync();
+            Console.WriteLine($"📊 Jogos encontrados no Banco: {matches.Count}");
+
+            if (matches.Any())
             {
-                return cachedMatches;
+                var primeiro = matches.First();
+                Console.WriteLine($"🧐 Analisando o jogo: {primeiro.HomeTeam} x {primeiro.AwayTeam}");
+                Console.WriteLine($"🔢 Quantidade de Odds neste jogo: {primeiro.Odds.Count}");
+
+                if (primeiro.Odds.Any())
+                {
+                    var odd = primeiro.Odds.First();
+                    Console.WriteLine($"💲 Valor da primeira odd: {odd.Value}");
+                    Console.WriteLine($"🏠 Casa de aposta (Bookmaker): {(odd.Bookmaker != null ? odd.Bookmaker.Name : "NULO (Erro no Include)")}");
+                }
+                else
+                {
+                    Console.WriteLine("❌ ERRO CRÍTICO: O jogo existe, mas a lista de Odds veio vazia do banco.");
+                    Console.WriteLine("👉 Provável causa: O MatchRepository não está fazendo o .Include(x => x.Odds) corretamente.");
+                }
             }
 
-            var matches = await _unitOfWork.Matches.GetAllAsync();
-
+            // 2. Conversão (Com proteção contra nulos para não quebrar a API)
             var dtos = matches.Select(m => new MatchDto(
                 m.Id,
                 m.HomeTeam,
@@ -40,18 +56,17 @@ namespace OddsScanner.Application.Services
                 m.StartTime,
                 m.League,
                 m.Odds.Select(o => new OddDto(
-                    o.Bookmaker.Name,
+                    o.Bookmaker != null ? o.Bookmaker.Name : "Desconhecido", // Proteção
                     o.Value,
-                    o.Selection
+                    o.Selection,
+                    o.Bookmaker != null ? (o.Bookmaker.WebsiteUrl ?? "") : ""
                 )).ToList()
             )).ToList();
 
-
-            await _cacheService.SetAsync(cacheKey, dtos, TimeSpan.FromSeconds(10));
+            Console.WriteLine("--- ✅ DIAGNÓSTICO FINALIZADO ---");
 
             return dtos;
         }
-
         public async Task CreateTestMatchAsync()
         {
             var bet365 = new Bookmaker("Bet365", "www.bet365.com");
@@ -70,6 +85,7 @@ namespace OddsScanner.Application.Services
             await _unitOfWork.CommitAsync();
 
             await _cacheService.RemoveAsync("matches_all");
+            await Task.CompletedTask;
         }
     }
 }

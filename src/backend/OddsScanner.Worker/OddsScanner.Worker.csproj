@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-OddsScanner.Worker-b1847a43-e5d9-49fa-a372-c189afc3d90a</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OddsScanner.Infrastructure\OddsScanner.Infrastructure.csproj" />
+    <ProjectReference Include="..\OddsScanner.Domain\OddsScanner.Domain.csproj" />
+    <ProjectReference Include="..\OddsScanner.Application\OddsScanner.Application.csproj" />
+  </ItemGroup>
+</Project>

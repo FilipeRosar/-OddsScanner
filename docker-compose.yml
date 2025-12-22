@@ -1,0 +1,74 @@
+services:
+  # -------------------------
+  # INFRAESTRUTURA (DB & CACHE)
+  # -------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: oddsscanner-db
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: adminpassword
+      POSTGRES_DB: oddsscanner_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d oddsscanner_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: oddsscanner-cache
+    ports:
+      - "6379:6379"
+    command: redis-server --save 60 1 --loglevel warning
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # -------------------------
+  # BACKEND (.NET API)
+  # -------------------------
+  backend:
+    container_name: oddsscanner-api
+    build:
+      context: ./src/backend
+      dockerfile: Dockerfile
+    ports:
+      - "5000:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=oddsscanner_db;Username=admin;Password=adminpassword;
+      - ConnectionStrings__Redis=redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # -------------------------
+  # FRONTEND (NEXT.JS)
+  # -------------------------
+  frontend:
+    container_name: oddsscanner-web
+    build:
+      context: ./src/frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - API_URL_INTERNAL=http://backend:8080
+      - NEXT_PUBLIC_API_URL=http://localhost:5000
+    depends_on:
+      - backend
+
+# -------------------------
+# VOLUMES (A PARTE QUE FALTOU)
+# -------------------------
+volumes:
+  postgres_data:

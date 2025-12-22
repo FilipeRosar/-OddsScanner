@@ -11,9 +11,18 @@
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/
+.vs/
+bin/
+obj/
+*.user
+*.suo
+[Dd]ebug/
+[Rr]elease/
+appsettings.Development.json
 [Rr]eleases/
 x64/
 x86/
+Dockerfile
 [Ww][Ii][Nn]32/
 [Aa][Rr][Mm]/
 [Aa][Rr][Mm]64/
@@ -35,7 +44,20 @@ ScaffoldingReadMe.txt
 *.nupkg
 # NuGet Symbol Packages
 *.snupkg
+# --- Visual Studio Code ---
+.vscode/
 
+# --- Frontend (Node/Next.js) ---
+node_modules/
+.next/
+dist/
+build/
+.env
+.env.local
+
+# --- OS Files ---
+.DS_Store
+Thumbs.db
 # Others
 ~$*
 *~

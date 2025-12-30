@@ -8,21 +8,27 @@ using System.Threading.Tasks;
 namespace OddsScanner.Application.DTOs
 {
     public record OddDto(
-    [property: JsonPropertyName("bookmakerName")] 
+    [property: JsonPropertyName("bookmakerName")]
     string BookmakerName,
-    [property: JsonPropertyName("value")] 
+    [property: JsonPropertyName("value")]
     decimal Value,
-    [property: JsonPropertyName("selection")] 
+    [property: JsonPropertyName("selection")]
     string Selection,
-    [property: JsonPropertyName("bookmakerUrl")] 
+    [property: JsonPropertyName("bookmakerUrl")]
     string BookmakerUrl
 );
-    public record MatchDto(
-     [property: JsonPropertyName("id")] Guid Id,
-     [property: JsonPropertyName("homeTeam")] string HomeTeam,
-     [property: JsonPropertyName("awayTeam")] string AwayTeam,
-     [property: JsonPropertyName("startTime")] DateTime StartTime,
-     [property: JsonPropertyName("league")] string League,
-     [property: JsonPropertyName("odds")] List<OddDto> Odds
- );
+    public record MatchDto
+    {
+        [JsonPropertyName("id")] public Guid Id { get; init; }
+        [JsonPropertyName("homeTeam")] public string HomeTeam { get; init; } = string.Empty;
+        [JsonPropertyName("awayTeam")] public string AwayTeam { get; init; } = string.Empty;
+        [JsonPropertyName("startTime")] public DateTime StartTime { get; init; }
+        [JsonPropertyName("league")] public string League { get; init; } = string.Empty;
+        [JsonPropertyName("odds")] public List<OddDto> Odds { get; init; } = new();
+
+        [JsonPropertyName("isLive")]
+        public bool IsLive => DateTime.UtcNow > StartTime;
+        [JsonPropertyName("surebetProfit")]
+        public string? SurebetProfit { get; init; }
+    }
 }

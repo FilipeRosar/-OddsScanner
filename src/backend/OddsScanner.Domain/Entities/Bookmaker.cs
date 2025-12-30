@@ -10,13 +10,12 @@ namespace OddsScanner.Domain.Entities
     {
         public string Name { get; private set; } 
         public string WebsiteUrl { get; private set; }
-
-        public Bookmaker(string name, string websiteUrl)
+        public string AffiliateUrl { get; private set; }
+        public Bookmaker(string name, string websiteUrl, string affiliateUrl = null)
         {
-            if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Nome é obrigatório");
-
             Name = name;
             WebsiteUrl = websiteUrl;
+            AffiliateUrl = affiliateUrl ?? websiteUrl; // fallback
         }
         protected Bookmaker() { }
     }

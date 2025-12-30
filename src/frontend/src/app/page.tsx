@@ -1,18 +1,19 @@
-import { Match } from "@/app/types/index";
+import { Match } from "@/app/types";
 import MatchList from "@/app/components/MatchList";
+import Link from "next/link";
+import { Bell } from "lucide-react"; // ícone de sino
 
-// Função para buscar dados da API
 async function getMatches(): Promise<Match[]> {
   try {
-    const res = await fetch('http://localhost:5175/api/matches', { 
-      cache: 'no-store' 
+    const res = await fetch("http://localhost:5175/api/matches", {
+      cache: "no-store",
+      next: { revalidate: 30 },
     });
-    
-    if (!res.ok) throw new Error('Falha ao buscar jogos');
-    
+
+    if (!res.ok) throw new Error("Falha ao buscar jogos");
     return res.json();
   } catch (error) {
-    console.error(error);
+    console.error("Erro ao carregar matches:", error);
     return [];
   }
 }
@@ -21,32 +22,54 @@ export default async function Home() {
   const matches = await getMatches();
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      {/* Header Bonito */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">⚽</span>
-            <h1 className="text-xl font-black text-slate-800 tracking-tight">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">⚽</span>
+            <h1 className="text-2xl font-black tracking-tight">
               Odds<span className="text-indigo-600">Scanner</span>
             </h1>
           </div>
-          <div className="text-sm text-slate-500">
-            Monitorando <strong className="text-indigo-600">{matches.length}</strong> jogos
+
+          <div className="flex items-center gap-6">
+            {/* Contador de jogos ao vivo */}
+            <div className="hidden sm:flex items-center gap-2 px-4 py-1.5 bg-green-100 text-green-700 rounded-full text-sm font-bold">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+              Ao Vivo
+            </div>
+
+            {/* Contador de jogos */}
+            <div className="text-sm text-slate-600">
+              <strong className="text-indigo-600 font-bold">{matches.length}</strong> jogos monitorados
+            </div>
+
+            {/* Botão de Alertas */}
+            <Link
+                href="/alertas" 
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-lg flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
+              >
+                <Bell className="w-5 h-5" />
+                Alertas Grátis
+              </Link>
           </div>
         </div>
       </header>
 
-      {/* Conteúdo Principal */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-slate-800">Mercado de Apostas</h2>
-          <p className="text-slate-500">Compare odds e encontre valor em tempo real.</p>
+      {/* Conteúdo principal */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div className="mb-10 text-center">
+          <h2 className="text-3xl font-bold text-slate-900 mb-4">
+            Mercado de Apostas em Tempo Real
+          </h2>
+          <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+            Encontre as melhores odds, value bets e oportunidades de lucro garantido com surebets.
+          </p>
         </div>
 
-        {/* Aqui entra nosso componente interativo */}
         <MatchList initialMatches={matches} />
-      </div>
+      </section>
     </main>
   );
 }

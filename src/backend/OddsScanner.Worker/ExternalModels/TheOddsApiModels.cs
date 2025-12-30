@@ -2,35 +2,40 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace OddsScanner.Worker.ExternalModels
 {
     public class ExternalMatch
     {
-        public string id { get; set; }
-        public string home_team { get; set; }
-        public string away_team { get; set; }
-        public DateTime commence_time { get; set; }
-        public List<ExternalBookmaker> bookmakers { get; set; }
+        [JsonPropertyName("id")] public string Id { get; set; } = string.Empty;
+        [JsonPropertyName("sport_key")] public string SportKey { get; set; } = string.Empty;
+        [JsonPropertyName("sport_title")] public string SportTitle { get; set; } = string.Empty;
+        [JsonPropertyName("commence_time")] public DateTime CommenceTime { get; set; }
+        [JsonPropertyName("home_team")] public string HomeTeam { get; set; } = string.Empty;
+        [JsonPropertyName("away_team")] public string AwayTeam { get; set; } = string.Empty;
+        [JsonPropertyName("bookmakers")] public List<TheOddsApiBookmaker> Bookmakers { get; set; } = new();
     }
 
-    public class ExternalBookmaker
+    public class TheOddsApiBookmaker
     {
-        public string key { get; set; } 
-        public string title { get; set; } 
-        public List<ExternalMarket> markets { get; set; }
+        [JsonPropertyName("key")] public string Key { get; set; } = string.Empty;
+        [JsonPropertyName("title")] public string Title { get; set; } = string.Empty;
+        [JsonPropertyName("last_update")] public DateTime LastUpdate { get; set; }
+        [JsonPropertyName("markets")] public List<TheOddsApiMarket> Markets { get; set; } = new();
     }
 
-    public class ExternalMarket
+    public class TheOddsApiMarket
     {
-        public string key { get; set; } 
-        public List<ExternalOutcome> outcomes { get; set; }
+        [JsonPropertyName("key")] public string Key { get; set; } = string.Empty;
+        [JsonPropertyName("outcomes")] public List<TheOddsApiOutcome> Outcomes { get; set; } = new();
     }
 
-    public class ExternalOutcome
+    public class TheOddsApiOutcome
     {
-        public string name { get; set; } 
-        public decimal price { get; set; } 
+        [JsonPropertyName("name")] public string Name { get; set; } = string.Empty;
+        [JsonPropertyName("price")] public decimal Price { get; set; }
+        [JsonPropertyName("point")] public double? Point { get; set; }
     }
 }

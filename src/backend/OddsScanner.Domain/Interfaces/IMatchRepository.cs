@@ -14,7 +14,7 @@ namespace OddsScanner.Domain.Interfaces
         Task<List<Match>> GetAllForUpdateAsync();
         Task AddAsync(Match match);
         Task UpdateAsync(Match match);
-
+        Task<List<Match>> GetAllWithOddsAndBookmakersAsync();
         Task SaveChangesAsync();
     }
 }

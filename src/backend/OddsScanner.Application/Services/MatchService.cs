@@ -23,47 +23,71 @@ namespace OddsScanner.Application.Services
 
         public async Task<List<MatchDto>> GetAllMatchesAsync()
         {
-            Console.WriteLine("--- 🔍 INICIANDO DIAGNÓSTICO DA API ---");
+            Console.WriteLine("--- INICIANDO BUSCA DE JOGOS ---");
 
-            // 1. Busca do Banco
-            var matches = await _unitOfWork.Matches.GetAllAsync();
-            Console.WriteLine($"📊 Jogos encontrados no Banco: {matches.Count}");
+            var matches = await _unitOfWork.Matches.GetAllWithOddsAndBookmakersAsync();
+
+            Console.WriteLine($"Jogos encontrados no banco: {matches.Count}");
 
             if (matches.Any())
             {
                 var primeiro = matches.First();
-                Console.WriteLine($"🧐 Analisando o jogo: {primeiro.HomeTeam} x {primeiro.AwayTeam}");
-                Console.WriteLine($"🔢 Quantidade de Odds neste jogo: {primeiro.Odds.Count}");
+                Console.WriteLine($"Primeiro jogo: {primeiro.HomeTeam} x {primeiro.AwayTeam}");
+                Console.WriteLine($"Odds carregadas: {primeiro.Odds.Count}");
 
-                if (primeiro.Odds.Any())
+                foreach (var odd in primeiro.Odds.Take(6))
                 {
-                    var odd = primeiro.Odds.First();
-                    Console.WriteLine($"💲 Valor da primeira odd: {odd.Value}");
-                    Console.WriteLine($"🏠 Casa de aposta (Bookmaker): {(odd.Bookmaker != null ? odd.Bookmaker.Name : "NULO (Erro no Include)")}");
-                }
-                else
-                {
-                    Console.WriteLine("❌ ERRO CRÍTICO: O jogo existe, mas a lista de Odds veio vazia do banco.");
-                    Console.WriteLine("👉 Provável causa: O MatchRepository não está fazendo o .Include(x => x.Odds) corretamente.");
+                    Console.WriteLine($" → {odd.Selection}: {odd.Value:F2} @ {odd.Bookmaker?.Name ?? "NULO"}");
                 }
             }
 
-            // 2. Conversão (Com proteção contra nulos para não quebrar a API)
-            var dtos = matches.Select(m => new MatchDto(
-                m.Id,
-                m.HomeTeam,
-                m.AwayTeam,
-                m.StartTime,
-                m.League,
-                m.Odds.Select(o => new OddDto(
-                    o.Bookmaker != null ? o.Bookmaker.Name : "Desconhecido", // Proteção
+            var dtos = matches.Select(m =>
+            {
+                var oddDtos = m.Odds.Select(o => new OddDto(
+                    o.Bookmaker?.Name ?? "Desconhecido",
                     o.Value,
                     o.Selection,
-                    o.Bookmaker != null ? (o.Bookmaker.WebsiteUrl ?? "") : ""
-                )).ToList()
-            )).ToList();
+                    o.Bookmaker?.WebsiteUrl ?? ""
+                )).ToList();
 
-            Console.WriteLine("--- ✅ DIAGNÓSTICO FINALIZADO ---");
+                string? surebetProfit = null;
+                var homeOdds = oddDtos.Where(o => o.Selection == "Home").ToList();
+                var drawOdds = oddDtos.Where(o => o.Selection == "Draw").ToList();
+                var awayOdds = oddDtos.Where(o => o.Selection == "Away").ToList();
+
+                if (homeOdds.Any() && drawOdds.Any() && awayOdds.Any())
+                {
+                    var bestHome = homeOdds.MaxBy(o => o.Value)?.Value ?? 0m;
+                    var bestDraw = drawOdds.MaxBy(o => o.Value)?.Value ?? 0m;
+                    var bestAway = awayOdds.MaxBy(o => o.Value)?.Value ?? 0m;
+
+                    if (bestHome > 0 && bestDraw > 0 && bestAway > 0)
+                    {
+                        var arbitrage = 1 / bestHome + 1 / bestDraw + 1 / bestAway;
+
+                        if (arbitrage < 0.98m) 
+                        {
+                            var profit = ((1 / arbitrage) - 1) * 100;
+                            surebetProfit = profit.ToString("F2");
+                            Console.WriteLine($"SUREBET DETECTADA: {m.HomeTeam} x {m.AwayTeam} → +{surebetProfit}%");
+                        }
+                    }
+                }
+
+                return new MatchDto
+                {
+                    Id = m.Id,
+                    HomeTeam = m.HomeTeam,
+                    AwayTeam = m.AwayTeam,
+                    StartTime = m.StartTime,
+                    League = m.League,
+                    Odds = oddDtos,
+                    SurebetProfit = surebetProfit
+                };
+            }).ToList();
+
+            Console.WriteLine($"DTOs gerados: {dtos.Count}");
+            Console.WriteLine("--- BUSCA FINALIZADA ---");
 
             return dtos;
         }

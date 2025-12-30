@@ -11,5 +11,7 @@ export interface Match {
   awayTeam: string;
   startTime: string;
   league: string;
+  isLive: boolean;
   odds: Odd[];
+  surebetProfit?: number;
 }

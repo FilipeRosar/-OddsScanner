@@ -1,115 +1,172 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Match } from '@/app/types/index';
-import MatchCard from './MatchCard';
-import { Search, Filter, Radio, Frown } from 'lucide-react';
+import { useState, useMemo } from "react";
+import { Match } from "@/app/types";
+import MatchCard from "./MatchCard";
+import { Search, Filter, TrendingUp } from "lucide-react";
 
 interface MatchListProps {
   initialMatches: Match[];
 }
 
 export default function MatchList({ initialMatches }: MatchListProps) {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterState, setFilterState] = useState<'ALL' | 'LIVE'>('ALL');
-  const [now, setNow] = useState(new Date());
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedLeague, setSelectedLeague] = useState("Todas");
+  const [viewMode, setViewMode] = useState<"all" | "live" | "surebets">("all");
 
-  // Atualiza o relógio a cada minuto para garantir que o filtro "Ao Vivo" mude sozinho
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 60000);
-    return () => clearInterval(timer);
-  }, []);
+  // Separação de jogos
+  const liveMatches = useMemo(() => initialMatches.filter(m => m.isLive), [initialMatches]);
+  const surebetMatches = useMemo(() => initialMatches.filter(m => m.surebetProfit != null), [initialMatches]);
+  const upcomingMatches = useMemo(() => initialMatches.filter(m => !m.isLive), [initialMatches]);
 
-  const filteredMatches = initialMatches.filter(match => {
-    // 1. Filtro de Texto (Busca)
-    const matchesSearch = 
-      match.homeTeam.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      match.awayTeam.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      match.league.toLowerCase().includes(searchTerm.toLowerCase());
+  // Ligas para o filtro (depende da aba)
+  const leagues = useMemo(() => {
+    let source = initialMatches;
+    if (viewMode === "live") source = liveMatches;
+    if (viewMode === "surebets") source = surebetMatches;
+    const unique = Array.from(new Set(source.map(m => m.league)));
+    return ["Todas", ...unique.sort()];
+  }, [initialMatches, liveMatches, surebetMatches, viewMode]);
 
-    // 2. Filtro de Estado (Ao Vivo vs Todos)
-    let matchesState = true;
+  // Filtragem final
+  const filteredMatches = useMemo(() => {
+    let source = initialMatches;
+    if (viewMode === "live") source = liveMatches;
+    if (viewMode === "surebets") source = surebetMatches;
+    if (viewMode === "all") source = upcomingMatches.concat(liveMatches); // todos
 
-    if (filterState === 'LIVE') {
-      const matchTime = new Date(match.startTime);
-      // É Ao Vivo se: Já começou E começou a menos de 150 minutos (2h30 de jogo)
-      const diffInMinutes = (now.getTime() - matchTime.getTime()) / 1000 / 60;
-      matchesState = diffInMinutes >= 0 && diffInMinutes < 150; 
-    }
+    return source.filter(match => {
+      const matchesLeague = selectedLeague === "Todas" || match.league === selectedLeague;
+      const matchesSearch =
+        searchTerm === "" ||
+        match.homeTeam.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        match.awayTeam.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        match.league.toLowerCase().includes(searchTerm.toLowerCase());
 
-    return matchesSearch && matchesState;
-  });
+      return matchesLeague && matchesSearch;
+    });
+  }, [initialMatches, liveMatches, surebetMatches, upcomingMatches, viewMode, selectedLeague, searchTerm]);
 
   return (
-    <div className="space-y-8">
-      {/* Barra de Controle */}
-      <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-2 pr-2 pl-6 rounded-2xl shadow-sm border border-slate-200">
-        
-        {/* Input de Pesquisa */}
-        <div className="flex items-center gap-3 w-full md:w-96">
-          <Search className="w-5 h-5 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Buscar times, ligas..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full py-3 bg-transparent border-none focus:outline-none text-slate-700 placeholder:text-slate-400 font-medium"
-          />
-        </div>
+    <div className="space-y-6">
+      {/* Abas principais */}
+      <div className="flex gap-6 border-b border-gray-200 pb-2">
+        <button
+          onClick={() => setViewMode("all")}
+          className={`font-bold text-lg transition-colors relative pb-3 ${
+            viewMode === "all" 
+              ? "text-indigo-600 border-b-3 border-indigo-600" 
+              : "text-gray-600 hover:text-gray-800"
+          }`}
+        >
+          Todos os jogos
+          <span className="ml-2 text-sm font-normal text-gray-500">
+            ({initialMatches.length})
+          </span>
+        </button>
 
-        <div className="hidden md:block w-px h-8 bg-slate-200"></div>
+        <button
+          onClick={() => setViewMode("live")}
+          className={`font-bold text-lg transition-colors relative pb-3 flex items-center gap-2 ${
+            viewMode === "live" 
+              ? "text-red-600 border-b-3 border-red-600" 
+              : "text-gray-600 hover:text-gray-800"
+          }`}
+        >
+          <span className="relative flex">
+            <span className="w-3 h-3 bg-red-600 rounded-full animate-ping absolute"></span>
+            <span className="w-3 h-3 bg-red-600 rounded-full"></span>
+          </span>
+          Ao Vivo
+          <span className="ml-2 text-sm font-normal text-gray-500">
+            ({liveMatches.length})
+          </span>
+        </button>
 
-        {/* Botões de Filtro */}
-        <div className="flex gap-2 w-full md:w-auto">
-          <button 
-            onClick={() => setFilterState('ALL')}
-            className={`
-              flex-1 md:flex-none px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2
-              ${filterState === 'ALL' 
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' 
-                : 'bg-transparent text-slate-500 hover:bg-slate-50'
-              }
-            `}
-          >
-            <Filter className="w-4 h-4" />
-            Todos
-          </button>
-          
-          <button 
-            onClick={() => setFilterState('LIVE')}
-            className={`
-              flex-1 md:flex-none px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2
-              ${filterState === 'LIVE' 
-                ? 'bg-rose-500 text-white shadow-md shadow-rose-200' 
-                : 'bg-transparent text-slate-500 hover:bg-slate-50'
-              }
-            `}
-          >
-            <Radio className={`w-4 h-4 ${filterState === 'LIVE' ? 'animate-pulse' : ''}`} />
-            Ao Vivo
-          </button>
-        </div>
+        {/* Aba Surebets do Dia */}
+        <button
+          onClick={() => setViewMode("surebets")}
+          className={`font-bold text-lg transition-colors relative pb-3 flex items-center gap-2 ${
+            viewMode === "surebets" 
+              ? "text-emerald-600 border-b-3 border-emerald-600" 
+              : "text-gray-600 hover:text-gray-800"
+          }`}
+        >
+          <TrendingUp className="w-5 h-5" />
+          Surebets do Dia
+          <span className="ml-2 text-sm font-normal text-gray-500">
+            ({surebetMatches.length})
+          </span>
+          {surebetMatches.length > 0 && (
+            <span className="ml-2 bg-emerald-500 text-white text-xs px-2 py-0.5 rounded-full animate-pulse">
+              NOVO
+            </span>
+          )}
+        </button>
       </div>
 
-      {/* Grid de Resultados */}
-      {filteredMatches.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredMatches.map((match) => (
-            <MatchCard key={match.id} match={match} />
-          ))}
+      {/* Filtros (só aparece nas abas normais) */}
+      {viewMode !== "surebets" && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+              <input
+                type="text"
+                placeholder="Buscar time ou liga..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800"
+              />
+            </div>
+            <div className="relative">
+              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+              <select
+                value={selectedLeague}
+                onChange={(e) => setSelectedLeague(e.target.value)}
+                className="w-full pl-10 pr-10 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none bg-white text-slate-800 font-medium cursor-pointer"
+              >
+                {leagues.map(league => (
+                  <option key={league} value={league}>
+                    {league === "Todas" ? "Todas as ligas" : league}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mensagem especial para Surebets */}
+      {viewMode === "surebets" && surebetMatches.length === 0 && (
+        <div className="text-center py-16 bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl border-2 border-emerald-200">
+          <TrendingUp className="w-16 h-16 mx-auto text-emerald-600 mb-4" />
+          <p className="text-2xl font-bold text-emerald-800">Nenhuma Surebet no momento</p>
+          <p className="text-emerald-600 mt-2 max-w-md mx-auto">
+            Surebets são raras, mas quando aparecem, garantem lucro independente do resultado. 
+            Fique de olho — novas oportunidades surgem a todo momento!
+          </p>
+        </div>
+      )}
+
+      {/* Lista de jogos */}
+      {filteredMatches.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-xl shadow-sm border border-slate-200">
+          <p className="text-xl text-slate-600 font-medium">
+            {viewMode === "surebets" ? "Nenhuma Surebet encontrada" : "Nenhum jogo encontrado"}
+          </p>
+          <p className="text-slate-500 mt-2">Tente ajustar os filtros.</p>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-          <div className="bg-slate-100 p-4 rounded-full mb-4">
-            <Frown className="w-8 h-8 text-slate-400" />
-          </div>
-          <p className="text-lg font-medium">Nenhum jogo encontrado</p>
-          <p className="text-sm">
-            {filterState === 'LIVE' 
-              ? "Nenhum jogo rolando agora. Tente ver 'Todos'." 
-              : `Não achei nada para "${searchTerm}"`
-            }
-          </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredMatches.map(match => (
+            <MatchCard key={match.id} match={match} />
+          ))}
         </div>
       )}
     </div>

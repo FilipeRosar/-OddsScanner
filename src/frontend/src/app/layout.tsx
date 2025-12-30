@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import Script from "next/script";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,11 +24,31 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+    <html lang="pt-BR">
+      <head />
+      <body>
         {children}
+
+        {/* OneSignal Script */}
+        <Script
+          src="https://cdn.onesignal.com/sdks/OneSignalSDK.js"
+          strategy="afterInteractive"
+        />
+        <Script id="onesignal-init" strategy="afterInteractive">
+          {`
+            window.OneSignal = window.OneSignal || [];
+            OneSignal.push(function() {
+              OneSignal.init({
+                appId: "a9cd52e5-01ff-4605-a1f0-9d8ab2adff1e",
+                safari_web_id: "web.onesignal.auto",
+                notifyButton: {
+                  enable: false,
+                },
+                allowLocalhostAsSecureOrigin: true, 
+              });
+            });
+          `}
+        </Script>
       </body>
     </html>
   );

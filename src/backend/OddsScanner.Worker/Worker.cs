@@ -1,6 +1,9 @@
-﻿using OddsScanner.Application.Interfaces;
+﻿using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using OddsScanner.Application.Interfaces;
 using OddsScanner.Domain.Entities;
 using OddsScanner.Domain.Interfaces;
+using OddsScanner.Worker.ExternalModels;
 
 namespace OddsScanner.Worker;
 
@@ -9,19 +12,18 @@ public class Worker : BackgroundService
     private readonly ILogger<Worker> _logger;
     private readonly IServiceProvider _serviceProvider;
     private readonly OddsApiClient _apiClient;
-
-    public Worker(ILogger<Worker> logger, IServiceProvider serviceProvider, OddsApiClient apiClient)
+    private readonly INotificationService _notificationService;
+    public Worker(ILogger<Worker> logger, IServiceProvider serviceProvider, OddsApiClient apiClient, INotificationService notificationService)
     {
         _logger = logger;
         _serviceProvider = serviceProvider;
         _apiClient = apiClient;
+        _notificationService = notificationService;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // ⚠️ IMPORTANTE: Ajuste o tempo conforme seu plano da API (Free = 1h, Pago = menos)
-        // Para testes rápidos, pode deixar 1 minuto, mas cuidado com a cota.
-        var interval = TimeSpan.FromHours(1);
+        var interval = TimeSpan.FromMinutes(30); // Ajuste conforme seu plano
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -31,130 +33,231 @@ public class Worker : BackgroundService
             {
                 var allExternalMatches = await _apiClient.GetUpcomingMatchesAsync();
 
-                // 1. Filtra duplicatas da API (Agrupa por times e pega o primeiro)
+                if (!allExternalMatches.Any())
+                {
+                    _logger.LogWarning("Nenhum jogo retornado pela The Odds API.");
+                    await Task.Delay(interval, stoppingToken);
+                    continue;
+                }
+
+                // Remove duplicatas
                 var externalMatches = allExternalMatches
-                    .GroupBy(m => new { m.home_team, m.away_team })
-                    .Select(g => g.First())
+                    .GroupBy(m => new { m.HomeTeam, m.AwayTeam, Date = m.CommenceTime.Date })
+                    .Select(g => g.OrderByDescending(x => x.CommenceTime).First())
                     .ToList();
 
                 _logger.LogInformation($"Encontrados {externalMatches.Count} jogos únicos.");
 
-                using (var scope = _serviceProvider.CreateScope())
+                using var scope = _serviceProvider.CreateScope();
+                var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+                var cacheService = scope.ServiceProvider.GetRequiredService<ICacheService>();
+
+                var dbMatches = await unitOfWork.Matches.GetAllWithOddsAndBookmakersAsync();
+                var bookmakerCache = new Dictionary<string, Bookmaker>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var extMatch in externalMatches)
                 {
-                    var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-                    var cacheService = scope.ServiceProvider.GetRequiredService<ICacheService>();
+                    var existingMatch = dbMatches.FirstOrDefault(m =>
+                        string.Equals(m.HomeTeam, extMatch.HomeTeam, StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(m.AwayTeam, extMatch.AwayTeam, StringComparison.OrdinalIgnoreCase));
 
-                    // 2. Busca ou cria a Casa de Aposta padrão (Bet365)
-                    var bookmaker = await GetOrCreateBookmaker(unitOfWork, "Bet365");
+                    Match matchEntity = existingMatch ?? new Match(
+                        homeTeam: extMatch.HomeTeam,
+                        awayTeam: extMatch.AwayTeam,
+                        startTime: extMatch.CommenceTime.ToUniversalTime(),
+                        league: "Brasileirão Série A"
+                    );
 
-                    // 3. Traz TODOS os jogos do banco UMA VEZ SÓ (fora do loop)
-                    var dbMatches = await unitOfWork.Matches.GetAllForUpdateAsync();
-
-                    foreach (var extMatch in externalMatches)
+                    if (existingMatch == null)
                     {
-                        // Tenta achar o jogo na memória carregada
-                        var existingMatch = dbMatches.FirstOrDefault(m =>
-                            m.HomeTeam == extMatch.home_team &&
-                            m.AwayTeam == extMatch.away_team);
+                        await unitOfWork.Matches.AddAsync(matchEntity);
+                        _logger.LogInformation($"➕ Novo jogo: {matchEntity.HomeTeam} x {matchEntity.AwayTeam}");
+                    }
 
-                        if (existingMatch == null)
+                    bool anyChange = false;
+
+                    // Processa todas as bookmakers
+                    foreach (var extBookmaker in extMatch.Bookmakers)
+                    {
+                        var h2hMarket = extBookmaker.Markets?.FirstOrDefault(m => m.Key == "h2h");
+                        if (h2hMarket == null) continue;
+
+                        if (!bookmakerCache.TryGetValue(extBookmaker.Title, out var bookmaker))
                         {
-                            // --- C. CRIAR NOVO JOGO ---
-                            var newMatch = new Match(
-                                extMatch.home_team,
-                                extMatch.away_team,
-                                extMatch.commence_time.ToUniversalTime(),
-                                "Brasileirão Série A"
-                            );
-
-                            // Adiciona as odds (Modo Criação)
-                            ProcessOdds(newMatch, extMatch, bookmaker.Id);
-
-                            await unitOfWork.Matches.AddAsync(newMatch);
-                            _logger.LogInformation($"➕ Novo jogo: {newMatch.HomeTeam} x {newMatch.AwayTeam}");
+                            bookmaker = await GetOrCreateBookmaker(unitOfWork, extBookmaker.Title);
+                            bookmakerCache[extBookmaker.Title] = bookmaker;
                         }
-                        else
-                        {
-                            // --- U. ATUALIZAR JOGO EXISTENTE (SEM DELETE) ---
-                            // Apenas atualizamos os valores das odds existentes ou inserimos novas.
-                            // NÃO usamos Remove() aqui, o que evita o erro de concorrência.
-                            bool updated = ProcessOdds(existingMatch, extMatch, bookmaker.Id);
 
-                            if (updated)
-                                _logger.LogInformation($"🔄 Odds Atualizadas: {existingMatch.HomeTeam} x {existingMatch.AwayTeam}");
+                        if (ProcessOdds(matchEntity, extMatch, h2hMarket, bookmaker.Id))
+                        {
+                            anyChange = true;
                         }
                     }
 
-                    // 4. Salva tudo de uma vez
-                    await unitOfWork.CommitAsync();
+                    // === CÁLCULO E GESTÃO DE SUREBETS ===
+                    decimal? currentProfit = null;
+                    var bestHome = matchEntity.Odds.Where(o => o.Selection == "Home").MaxBy(o => o.Value)?.Value ?? 0m;
+                    var bestDraw = matchEntity.Odds.Where(o => o.Selection == "Draw").MaxBy(o => o.Value)?.Value ?? 0m;
+                    var bestAway = matchEntity.Odds.Where(o => o.Selection == "Away").MaxBy(o => o.Value)?.Value ?? 0m;
 
-                    // 5. Limpa cache
-                    await cacheService.RemoveAsync("matches_all");
-                    _logger.LogInformation("✅ Banco Sincronizado e Cache Limpo!");
+                    if (bestHome > 0 && bestDraw > 0 && bestAway > 0)
+                    {
+                        var arbitrage = 1 / bestHome + 1 / bestDraw + 1 / bestAway;
+
+                        if (arbitrage < 0.98m) // Lucro garantido
+                        {
+                            currentProfit = ((1 / arbitrage) - 1) * 100;
+
+                            var existingSurebet = matchEntity.Surebets.FirstOrDefault(s => s.IsActive);
+
+                            if (existingSurebet == null)
+                            {
+                                var newSurebet = new Surebet(matchEntity.Id, currentProfit.Value);
+                                matchEntity.Surebets.Add(newSurebet);
+                                anyChange = true;
+
+                                _logger.LogWarning($"🚨 NOVA SUREBET DETECTADA: {matchEntity.HomeTeam} x {matchEntity.AwayTeam} → +{currentProfit:F2}% lucro garantido!");
+
+                                // ENVIO DO ALERTA
+                                await _notificationService.SendSurebetAlertAsync(
+                                    matchEntity.HomeTeam,
+                                    matchEntity.AwayTeam,
+                                    currentProfit.Value
+                                );
+                            }
+                            else if (Math.Abs(existingSurebet.ProfitPercent - currentProfit.Value) > 0.1m)
+                            {
+                                existingSurebet.UpdateProfit(currentProfit.Value);
+                                anyChange = true;
+                            }
+                        }
+                        else if (matchEntity.Surebets.Any(s => s.IsActive))
+                        {
+                            // Surebet desapareceu
+                            foreach (var s in matchEntity.Surebets.Where(s => s.IsActive))
+                            {
+                                s.Deactivate();
+                            }
+                            anyChange = true;
+                        }
+                    }
+
+                    if (anyChange && existingMatch != null)
+                    {
+                        _logger.LogInformation($"🔄 Odds/Surebets atualizadas: {matchEntity.HomeTeam} x {matchEntity.AwayTeam}");
+                    }
                 }
+
+                await unitOfWork.CommitAsync();
+                await cacheService.RemoveAsync("matches_all");
+                _logger.LogInformation("✅ Sincronização completa e cache limpo!");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ Erro ao sincronizar dados");
+                _logger.LogError(ex, "❌ Erro na sincronização com The Odds API");
             }
 
-            _logger.LogInformation($"💤 Dormindo por {interval.TotalMinutes} minutos...");
+            _logger.LogInformation($"💤 Próxima execução em {interval.TotalMinutes} minutos...");
             await Task.Delay(interval, stoppingToken);
         }
     }
 
-    // Método inteligente: Atualiza se existe, Cria se não existe
-    private bool ProcessOdds(Match match, ExternalModels.ExternalMatch extMatch, Guid bookmakerId)
+    private bool ProcessOdds(Match match, ExternalMatch extMatch, TheOddsApiMarket h2hMarket, Guid bookmakerId)
     {
-        var firstBookmaker = extMatch.bookmakers.FirstOrDefault();
-        bool anyChange = false;
+        bool changed = false;
 
-        if (firstBookmaker != null)
+        foreach (var outcome in h2hMarket.Outcomes)
         {
-            var market = firstBookmaker.markets.FirstOrDefault(m => m.key == "h2h");
-            if (market != null)
+            string selection = outcome.Name switch
             {
-                foreach (var outcome in market.outcomes)
+                var n when string.Equals(n, extMatch.HomeTeam, StringComparison.OrdinalIgnoreCase) => "Home",
+                var n when string.Equals(n, extMatch.AwayTeam, StringComparison.OrdinalIgnoreCase) => "Away",
+                "Draw" or "Empate" => "Draw",
+                _ => "Draw"
+            };
+
+            var existingOdd = match.Odds.FirstOrDefault(o =>
+                o.BookmakerId == bookmakerId && o.Selection == selection);
+
+            if (existingOdd != null)
+            {
+                if (Math.Abs(existingOdd.Value - outcome.Price) > 0.001m)
                 {
-                    // Define qual é a seleção (Home, Draw, Away)
-                    string selection = "Draw";
-                    if (outcome.name == extMatch.home_team) selection = "Home";
-                    if (outcome.name == extMatch.away_team) selection = "Away";
-
-                    // 1. Tenta encontrar a Odd existente no jogo
-                    var existingOdd = match.Odds.FirstOrDefault(o =>
-                        o.BookmakerId == bookmakerId &&
-                        o.Selection == selection);
-
-                    if (existingOdd != null)
-                    {
-                        // UPDATE: Se já existe, só atualiza o preço
-                        if (existingOdd.Value != outcome.price)
-                        {
-                            existingOdd.UpdateValue(outcome.price);
-                            anyChange = true;
-                        }
-                    }
-                    else
-                    {
-                        // INSERT: Se não existe, cria nova
-                        match.Odds.Add(new Odd(outcome.price, "MoneyLine", selection, match.Id, bookmakerId));
-                        anyChange = true;
-                    }
+                    existingOdd.UpdateValue(outcome.Price);
+                    changed = true;
                 }
             }
+            else
+            {
+                match.Odds.Add(new Odd(
+                    value: outcome.Price,
+                    marketName: "MoneyLine",
+                    selection: selection,
+                    matchId: match.Id,
+                    bookmakerId: bookmakerId
+                ));
+                changed = true;
+            }
         }
-        return anyChange;
+
+        return changed;
     }
 
-    private async Task<Bookmaker> GetOrCreateBookmaker(IUnitOfWork uow, string name)
+    private async Task<Bookmaker> GetOrCreateBookmaker(IUnitOfWork uow, string title)
     {
-        var existing = await uow.Bookmakers.GetByNameAsync(name);
+        var existing = await uow.Bookmakers.GetByNameAsync(title);
         if (existing != null) return existing;
 
-        var newBookmaker = new Bookmaker(name, "www.oddsapi.com");
+        var slug = title.ToLower()
+            .Replace(" ", "")
+            .Replace(".", "")
+            .Replace("&", "");
+
+        var (websiteUrl, affiliateUrl) = title switch
+        {
+            "Betano" => (
+                "https://www.betano.com",
+                "https://www.betano.com/?aff=SEU_CODIGO_BETANO_AQUI" 
+            ),
+            "Bet365" => (
+                "https://www.bet365.com",
+                "https://www.bet365.com/?affiliate=SEU_CODIGO_BET365_AQUI" 
+            ),
+            "Pinnacle" => (
+                "https://www.pinnacle.com",
+                "https://www.pinnacle.com/?tag=SEU_TAG_PINNACLE_AQUI" 
+            ),
+            "Betfair" => (
+                "https://www.betfair.com",
+                "https://www.betfair.com/exchange/plus/?aff=SEU_ID_BETFAIR_AQUI" 
+            ),
+            "William Hill" => (
+                "https://sports.williamhill.com",
+                "https://sports.williamhill.com/betting/en-gb?aff=SEU_CODIGO_AQUI"
+            ),
+            "Betway" => (
+                "https://betway.com",
+                "https://betway.com/?aff=SEU_ID_BETWAY_AQUI"
+            ),
+            "888sport" => (
+                "https://www.888sport.com",
+                "https://www.888sport.com/?aff=SEU_ID_888_AQUI"
+            ),
+            _ => (
+                $"https://www.{slug}.com",
+                null 
+            )
+        };
+
+        var newBookmaker = new Bookmaker(
+            name: title,
+            websiteUrl: websiteUrl,
+            affiliateUrl: affiliateUrl ?? websiteUrl 
+        );
+
         await uow.Bookmakers.AddAsync(newBookmaker);
-        await uow.CommitAsync();
+        _logger.LogInformation($"Nova casa de apostas criada: {title} | Afiliado: {(affiliateUrl != null ? "SIM" : "NÃO")}");
+
         return newBookmaker;
     }
 }

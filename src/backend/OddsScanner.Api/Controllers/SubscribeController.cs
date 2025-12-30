@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using OddsScanner.Domain.Entities;
 using OddsScanner.Domain.Interfaces;
-using StackExchange.Redis;
 
 namespace OddsScanner.Api.Controllers
 {
@@ -37,11 +37,7 @@ namespace OddsScanner.Api.Controllers
                     return Ok(new { message = "Você já está inscrito!" });
                 }
 
-                var subscriber = new Subscriber
-                {
-                    Email = normalizedEmail,
-                    SubscribedAt = DateTime.UtcNow
-                };
+                var subscriber = new Subscriber(normalizedEmail);
 
                 await _unitOfWork.Subscribers.AddAsync(subscriber);
                 await _unitOfWork.CommitAsync();

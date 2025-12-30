@@ -15,7 +15,7 @@ namespace OddsScanner.Domain.Entities
         public string League { get; private set; }
 
         public ICollection<Odd> Odds { get; private set; } = new List<Odd>();
-
+        public ICollection<Surebet> Surebets { get; private set; } = new List<Surebet>();
         public Match(string homeTeam, string awayTeam, DateTime startTime, string league)
         {
             HomeTeam = homeTeam;

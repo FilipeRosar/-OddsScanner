@@ -10,6 +10,7 @@ namespace OddsScanner.Domain.Interfaces
     {
         IMatchRepository Matches { get; }
         IBookmakerRepository Bookmakers { get; }
+        ISubscriberRepository Subscribers { get; }
         Task CommitAsync();
     }
 }

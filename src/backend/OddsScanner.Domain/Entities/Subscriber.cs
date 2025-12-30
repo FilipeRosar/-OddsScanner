@@ -8,14 +8,14 @@ namespace OddsScanner.Domain.Entities
 {
     public class Subscriber : BaseEntity
     {
-        public string Email { get; private set; } = string.Empty;
-        public DateTime SubscribedAt { get; private set; }
+        public string Email { get; init; } = string.Empty;
+        public DateTime SubscribedAt { get; init; }
 
         protected Subscriber() { }
 
         public Subscriber(string email)
         {
-            Email = email.ToLowerInvariant().Trim();
+            Email = email.Trim().ToLowerInvariant();
             SubscribedAt = DateTime.UtcNow;
         }
     }

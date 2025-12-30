@@ -30,6 +30,10 @@ namespace OddsScanner.Infrastructure.Repositories
         {
             get { return _bookmakerRepository ??= new BookmakerRepository(_context); }
         }
+        public ISubscriberRepository Subscribers
+        {
+            get { return new SubscriberRepository(_context); }
+        }
         public async Task CommitAsync()
         {
             await _context.SaveChangesAsync();

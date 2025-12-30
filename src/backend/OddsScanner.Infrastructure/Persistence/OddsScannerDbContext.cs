@@ -18,7 +18,7 @@ namespace OddsScanner.Infrastructure.Persistence
         public DbSet<Match> Matches { get; set; }
         public DbSet<Bookmaker> Bookmakers { get; set; }
         public DbSet<Odd> Odds { get; set; }
-
+        public DbSet<Subscriber> Subscribers { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

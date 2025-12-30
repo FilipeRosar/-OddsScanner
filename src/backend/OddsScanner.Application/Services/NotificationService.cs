@@ -1,16 +1,12 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using OddsScanner.Application.Interfaces;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 
 namespace OddsScanner.Application.Services;
-
-public interface INotificationService
-{
-    Task SendSurebetAlertAsync(string homeTeam, string awayTeam, decimal profitPercent);
-}
 
 public class NotificationService : INotificationService
 {
@@ -29,6 +25,107 @@ public class NotificationService : INotificationService
         _oneSignalApiKey = config["OneSignal:ApiKey"] ?? throw new ArgumentNullException("OneSignal:ApiKey não configurado");
         _resendApiKey = config["Resend:ApiKey"] ?? throw new ArgumentNullException("Resend:ApiKey não configurado");
         _siteUrl = config["SiteUrl"] ?? "https://seu-odds-scanner.com";
+    }
+
+    public async Task SendDroppingOddsAlertAsync(string homeTeam, string awayTeam, string selection, decimal dropPercent, string bookmaker)
+    {
+        var title = selection switch
+        {
+            "Home" => homeTeam,
+            "Draw" => "Empate",
+            "Away" => awayTeam,
+            _ => selection
+        };
+
+        var shortMessage = $"{homeTeam} x {awayTeam} ({title}): ↓{dropPercent:F1}% na {bookmaker}";
+        var fullMessage = $"DROPPING ODDS DETECTADA! {homeTeam} x {awayTeam}\n" +
+                          $"Odd de {title} caiu {dropPercent:F1}% na {bookmaker}\n" +
+                          $"Possível entrada de sharp money — apostadores profissionais estão atuando!";
+
+        try
+        {
+            // 1. Push via OneSignal
+            var pushPayload = new
+            {
+                app_id = _oneSignalAppId,
+                include_all_segments = new[] { "All" },
+                headings = new { en = "🔥 DROPPING ODDS!" },
+                contents = new { en = shortMessage },
+                url = _siteUrl,
+                large_icon = "https://seu-site.com/icon-512.png",
+                chrome_web_icon = "https://seu-site.com/icon-192.png"
+            };
+
+            var pushContent = new StringContent(JsonSerializer.Serialize(pushPayload), Encoding.UTF8, "application/json");
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", _oneSignalApiKey);
+
+            var pushResponse = await _httpClient.PostAsync("https://onesignal.com/api/v1/notifications", pushContent);
+
+            if (!pushResponse.IsSuccessStatusCode)
+            {
+                var error = await pushResponse.Content.ReadAsStringAsync();
+                _logger.LogError($"Falha ao enviar push Dropping Odds: {pushResponse.StatusCode} - {error}");
+            }
+            else
+            {
+                _logger.LogInformation($"Push Dropping Odds enviado: {shortMessage}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao enviar push de Dropping Odds via OneSignal");
+        }
+
+        try
+        {
+            // 2. Email via Resend
+            var emailPayload = new
+            {
+                from = "alertas@seuodds scanner.com",
+                to = new[] { "seu-email@gmail.com" }, // substitua por lista real ou banco
+                subject = "🔥 Dropping Odds Detectada!",
+                html = $"""
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px; background: #1a1a1a; color: #e0e0e0;">
+                    <h1 style="color: #ef4444; text-align: center;">🔥 DROPPING ODDS DETECTADA!</h1>
+                    <h2 style="color: #fff; text-align: center;">{homeTeam} x {awayTeam}</h2>
+                    <p style="font-size: 20px; color: #ef4444; font-weight: bold; text-align: center;">
+                        Odd de <strong>{title}</strong> caiu <strong>{dropPercent:F1}%</strong> na <strong>{bookmaker}</strong>
+                    </p>
+                    <p style="font-size: 16px; line-height: 1.6;">
+                        Isso indica forte movimento de dinheiro — possivelmente de <strong>apostadores profissionais (sharps)</strong>.<br/>
+                        Quando odds caem rápido em casas sharp como Pinnacle, é sinal de informação privilegiada ou volume alto.
+                    </p>
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="{_siteUrl}" style="display: inline-block; background: #ef4444; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 18px;">
+                            Ver Odd Agora
+                        </a>
+                    </div>
+                    <p style="font-size: 12px; color: #888; text-align: center; margin-top: 40px;">
+                        Você recebeu este alerta porque está inscrito nas notificações do OddsScanner.
+                    </p>
+                </div>
+                """
+            };
+
+            var emailContent = new StringContent(JsonSerializer.Serialize(emailPayload), Encoding.UTF8, "application/json");
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _resendApiKey);
+
+            var emailResponse = await _httpClient.PostAsync("https://api.resend.com/emails", emailContent);
+
+            if (!emailResponse.IsSuccessStatusCode)
+            {
+                var error = await emailResponse.Content.ReadAsStringAsync();
+                _logger.LogError($"Falha ao enviar email Dropping Odds: {emailResponse.StatusCode} - {error}");
+            }
+            else
+            {
+                _logger.LogInformation($"Email Dropping Odds enviado: {shortMessage}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao enviar email de Dropping Odds via Resend");
+        }
     }
 
     public async Task SendSurebetAlertAsync(string homeTeam, string awayTeam, decimal profitPercent)
@@ -75,7 +172,7 @@ public class NotificationService : INotificationService
             var emailPayload = new
             {
                 from = "alertas@seuodds scanner.com",
-                to = new[] { "seu-email@gmail.com" }, // substitua por lista real ou banco
+                to = new[] { "filiperosa0312@gmail.com" }, 
                 subject = "🚨 Surebet Encontrada!",
                 html = $"""
                     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">

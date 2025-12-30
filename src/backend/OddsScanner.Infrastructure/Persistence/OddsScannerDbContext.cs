@@ -1,11 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using OddsScanner.Domain.Entities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection.Emit;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace OddsScanner.Infrastructure.Persistence
 {
@@ -15,41 +9,78 @@ namespace OddsScanner.Infrastructure.Persistence
         {
         }
 
-        public DbSet<Match> Matches { get; set; }
-        public DbSet<Bookmaker> Bookmakers { get; set; }
-        public DbSet<Odd> Odds { get; set; }
-        public DbSet<Subscriber> Subscribers { get; set; }
+        public DbSet<Match> Matches { get; set; } = null!;
+        public DbSet<Bookmaker> Bookmakers { get; set; } = null!;
+        public DbSet<Odd> Odds { get; set; } = null!;
+        public DbSet<Subscriber> Subscribers { get; set; } = null!;
+        public DbSet<Surebet> Surebets { get; set; } = null!; 
+        public DbSet<OddHistory> OddHistories { get; set; } = null!;
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
             modelBuilder.Entity<Match>(entity =>
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.HomeTeam).IsRequired().HasMaxLength(100);
                 entity.Property(e => e.AwayTeam).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.League).IsRequired().HasMaxLength(100);
 
                 entity.HasMany(m => m.Odds)
                       .WithOne(o => o.Match)
                       .HasForeignKey(o => o.MatchId)
-                      .OnDelete(DeleteBehavior.Cascade); 
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasMany(m => m.Surebets)
+                      .WithOne(s => s.Match)
+                      .HasForeignKey(s => s.MatchId)
+                      .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<Bookmaker>(entity =>
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Name).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.WebsiteUrl).IsRequired().HasMaxLength(500);
+                entity.Property(e => e.AffiliateUrl).HasMaxLength(500); 
             });
-
+            modelBuilder.Entity<OddHistory>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Value).HasPrecision(10, 2);
+                entity.HasOne(e => e.Odd)
+                      .WithMany()
+                      .HasForeignKey(e => e.OddId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasIndex(e => new { e.OddId, e.RecordedAt });
+            });
             modelBuilder.Entity<Odd>(entity =>
             {
                 entity.HasKey(e => e.Id);
-
-                entity.Property(e => e.Value).HasPrecision(10, 2); 
+                entity.Property(e => e.Value).HasPrecision(10, 2);
+                entity.Property(e => e.Selection).IsRequired().HasMaxLength(20);
 
                 entity.HasOne(o => o.Bookmaker)
                       .WithMany()
                       .HasForeignKey(o => o.BookmakerId)
-                      .OnDelete(DeleteBehavior.Restrict); 
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasMany(o => o.History)
+                  .WithOne(h => h.Odd)
+                  .HasForeignKey(h => h.OddId);
+            });
+
+            modelBuilder.Entity<Subscriber>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Email).IsRequired().HasMaxLength(200);
+                entity.HasIndex(e => e.Email).IsUnique();
+            });
+
+            modelBuilder.Entity<Surebet>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.ProfitPercent).HasPrecision(10, 2);
+                entity.Property(e => e.IsActive).HasDefaultValue(true);
             });
         }
     }

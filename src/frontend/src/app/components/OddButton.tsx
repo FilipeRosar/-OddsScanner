@@ -5,14 +5,21 @@ interface OddButtonProps {
     value: number;
     bookmakerName: string;
     bookmakerUrl: string;
-    affiliateUrl?: string; // opcional, se vier do backend
+    affiliateUrl?: string;
   } | null;
   allOddsForSelection: { value: number }[];
   label: "1" | "X" | "2";
   icon: "home" | "draw" | "away";
+  dropPercent?: number; 
 }
 
-export default function OddButton({ bestOdd, allOddsForSelection, label, icon }: OddButtonProps) {
+export default function OddButton({ 
+  bestOdd, 
+  allOddsForSelection, 
+  label, 
+  icon,
+  dropPercent = 0 // padrão 0 se não vier do backend
+}: OddButtonProps) {
   // Cálculo do Value Bet
   const calculateValuePercent = () => {
     if (!bestOdd || allOddsForSelection.length < 2) return null;
@@ -34,7 +41,6 @@ export default function OddButton({ bestOdd, allOddsForSelection, label, icon }:
     );
   }
 
-  // Prioriza affiliateUrl se existir, senão usa bookmakerUrl normal
   const linkUrl = bestOdd.affiliateUrl || bestOdd.bookmakerUrl || "#";
 
   return (
@@ -53,6 +59,20 @@ export default function OddButton({ bestOdd, allOddsForSelection, label, icon }:
       {valuePercent && (
         <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-orange-500 text-white text-[8px] font-black px-2 py-1 rounded-full shadow-lg z-10 animate-bounce">
           +{valuePercent}% VALUE
+        </div>
+      )}
+
+      {/* Badge DROPPING ODDS NORMAL (>10%) */}
+      {dropPercent > 10 && dropPercent <= 20 && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-red-600 text-white text-[8px] font-black px-2 py-1 rounded-full shadow-lg z-10 animate-pulse">
+          ↓ {dropPercent.toFixed(1)}% DROP
+        </div>
+      )}
+
+      {/* Badge SHARP MONEY (>20%) */}
+      {dropPercent > 20 && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-black text-white text-[8px] font-black px-2 py-1 rounded-full shadow-lg z-10 animate-pulse border-2 border-red-600">
+          SHARP MONEY ↓ {dropPercent.toFixed(1)}%
         </div>
       )}
 

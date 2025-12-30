@@ -12,18 +12,20 @@ public class Worker : BackgroundService
     private readonly ILogger<Worker> _logger;
     private readonly IServiceProvider _serviceProvider;
     private readonly OddsApiClient _apiClient;
-    private readonly INotificationService _notificationService;
-    public Worker(ILogger<Worker> logger, IServiceProvider serviceProvider, OddsApiClient apiClient, INotificationService notificationService)
+
+    public Worker(
+        ILogger<Worker> logger,
+        IServiceProvider serviceProvider,
+        OddsApiClient apiClient)
     {
         _logger = logger;
         _serviceProvider = serviceProvider;
         _apiClient = apiClient;
-        _notificationService = notificationService;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var interval = TimeSpan.FromMinutes(30); // Ajuste conforme seu plano
+        var interval = TimeSpan.FromMinutes(30);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -40,7 +42,6 @@ public class Worker : BackgroundService
                     continue;
                 }
 
-                // Remove duplicatas
                 var externalMatches = allExternalMatches
                     .GroupBy(m => new { m.HomeTeam, m.AwayTeam, Date = m.CommenceTime.Date })
                     .Select(g => g.OrderByDescending(x => x.CommenceTime).First())
@@ -51,6 +52,7 @@ public class Worker : BackgroundService
                 using var scope = _serviceProvider.CreateScope();
                 var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
                 var cacheService = scope.ServiceProvider.GetRequiredService<ICacheService>();
+                var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
 
                 var dbMatches = await unitOfWork.Matches.GetAllWithOddsAndBookmakersAsync();
                 var bookmakerCache = new Dictionary<string, Bookmaker>(StringComparer.OrdinalIgnoreCase);
@@ -76,7 +78,6 @@ public class Worker : BackgroundService
 
                     bool anyChange = false;
 
-                    // Processa todas as bookmakers
                     foreach (var extBookmaker in extMatch.Bookmakers)
                     {
                         var h2hMarket = extBookmaker.Markets?.FirstOrDefault(m => m.Key == "h2h");
@@ -88,13 +89,13 @@ public class Worker : BackgroundService
                             bookmakerCache[extBookmaker.Title] = bookmaker;
                         }
 
-                        if (ProcessOdds(matchEntity, extMatch, h2hMarket, bookmaker.Id))
+                        if (await ProcessOdds(matchEntity, extMatch, h2hMarket, bookmaker.Id, notificationService))
                         {
                             anyChange = true;
                         }
                     }
 
-                    // === CÁLCULO E GESTÃO DE SUREBETS ===
+                    // Cálculo de surebet (mantido igual)
                     decimal? currentProfit = null;
                     var bestHome = matchEntity.Odds.Where(o => o.Selection == "Home").MaxBy(o => o.Value)?.Value ?? 0m;
                     var bestDraw = matchEntity.Odds.Where(o => o.Selection == "Draw").MaxBy(o => o.Value)?.Value ?? 0m;
@@ -104,7 +105,7 @@ public class Worker : BackgroundService
                     {
                         var arbitrage = 1 / bestHome + 1 / bestDraw + 1 / bestAway;
 
-                        if (arbitrage < 0.98m) // Lucro garantido
+                        if (arbitrage < 0.98m)
                         {
                             currentProfit = ((1 / arbitrage) - 1) * 100;
 
@@ -118,8 +119,7 @@ public class Worker : BackgroundService
 
                                 _logger.LogWarning($"🚨 NOVA SUREBET DETECTADA: {matchEntity.HomeTeam} x {matchEntity.AwayTeam} → +{currentProfit:F2}% lucro garantido!");
 
-                                // ENVIO DO ALERTA
-                                await _notificationService.SendSurebetAlertAsync(
+                                await notificationService.SendSurebetAlertAsync(
                                     matchEntity.HomeTeam,
                                     matchEntity.AwayTeam,
                                     currentProfit.Value
@@ -133,7 +133,6 @@ public class Worker : BackgroundService
                         }
                         else if (matchEntity.Surebets.Any(s => s.IsActive))
                         {
-                            // Surebet desapareceu
                             foreach (var s in matchEntity.Surebets.Where(s => s.IsActive))
                             {
                                 s.Deactivate();
@@ -162,7 +161,12 @@ public class Worker : BackgroundService
         }
     }
 
-    private bool ProcessOdds(Match match, ExternalMatch extMatch, TheOddsApiMarket h2hMarket, Guid bookmakerId)
+    private async Task<bool> ProcessOdds(
+    Match match,
+    ExternalMatch extMatch,
+    TheOddsApiMarket h2hMarket,
+    Guid bookmakerId,
+    INotificationService notificationService)
     {
         bool changed = false;
 
@@ -183,20 +187,47 @@ public class Worker : BackgroundService
             {
                 if (Math.Abs(existingOdd.Value - outcome.Price) > 0.001m)
                 {
+                    // Salva histórico antes de atualizar
+                    existingOdd.History.Add(new OddHistory(existingOdd.Id, existingOdd.Value));
+
+                    // Calcula drop %
+                    var previousValue = existingOdd.Value;
+                    var dropPercent = ((previousValue - outcome.Price) / previousValue) * 100;
+
                     existingOdd.UpdateValue(outcome.Price);
                     changed = true;
+
+                    if (dropPercent > 10)
+                    {
+                        _logger.LogWarning($"DROPPING ODDS: {match.HomeTeam} x {match.AwayTeam} ({selection}) caiu {dropPercent:F1}% na {existingOdd.Bookmaker.Name}");
+
+                        if (dropPercent > 15)
+                        {
+                            await notificationService.SendDroppingOddsAlertAsync(
+                                match.HomeTeam,
+                                match.AwayTeam,
+                                selection,
+                                dropPercent,
+                                existingOdd.Bookmaker.Name
+                            );
+                        }
+                    }
                 }
             }
             else
             {
-                match.Odds.Add(new Odd(
+                var newOdd = new Odd(
                     value: outcome.Price,
                     marketName: "MoneyLine",
                     selection: selection,
                     matchId: match.Id,
                     bookmakerId: bookmakerId
-                ));
+                );
+                match.Odds.Add(newOdd);
                 changed = true;
+
+                // Primeiro histórico
+                newOdd.History.Add(new OddHistory(newOdd.Id, outcome.Price));
             }
         }
 
@@ -215,44 +246,20 @@ public class Worker : BackgroundService
 
         var (websiteUrl, affiliateUrl) = title switch
         {
-            "Betano" => (
-                "https://www.betano.com",
-                "https://www.betano.com/?aff=SEU_CODIGO_BETANO_AQUI" 
-            ),
-            "Bet365" => (
-                "https://www.bet365.com",
-                "https://www.bet365.com/?affiliate=SEU_CODIGO_BET365_AQUI" 
-            ),
-            "Pinnacle" => (
-                "https://www.pinnacle.com",
-                "https://www.pinnacle.com/?tag=SEU_TAG_PINNACLE_AQUI" 
-            ),
-            "Betfair" => (
-                "https://www.betfair.com",
-                "https://www.betfair.com/exchange/plus/?aff=SEU_ID_BETFAIR_AQUI" 
-            ),
-            "William Hill" => (
-                "https://sports.williamhill.com",
-                "https://sports.williamhill.com/betting/en-gb?aff=SEU_CODIGO_AQUI"
-            ),
-            "Betway" => (
-                "https://betway.com",
-                "https://betway.com/?aff=SEU_ID_BETWAY_AQUI"
-            ),
-            "888sport" => (
-                "https://www.888sport.com",
-                "https://www.888sport.com/?aff=SEU_ID_888_AQUI"
-            ),
-            _ => (
-                $"https://www.{slug}.com",
-                null 
-            )
+            "Betano" => ("https://www.betano.com", "https://www.betano.com/?aff=SEU_CODIGO_BETANO_AQUI"),
+            "Bet365" => ("https://www.bet365.com", "https://www.bet365.com/?affiliate=SEU_CODIGO_BET365_AQUI"),
+            "Pinnacle" => ("https://www.pinnacle.com", "https://www.pinnacle.com/?tag=SEU_TAG_PINNACLE_AQUI"),
+            "Betfair" => ("https://www.betfair.com", "https://www.betfair.com/exchange/plus/?aff=SEU_ID_BETFAIR_AQUI"),
+            "William Hill" => ("https://sports.williamhill.com", "https://sports.williamhill.com/betting/en-gb?aff=SEU_CODIGO_AQUI"),
+            "Betway" => ("https://betway.com", "https://betway.com/?aff=SEU_ID_BETWAY_AQUI"),
+            "888sport" => ("https://www.888sport.com", "https://www.888sport.com/?aff=SEU_ID_888_AQUI"),
+            _ => ($"https://www.{slug}.com", null)
         };
 
         var newBookmaker = new Bookmaker(
             name: title,
             websiteUrl: websiteUrl,
-            affiliateUrl: affiliateUrl ?? websiteUrl 
+            affiliateUrl: affiliateUrl ?? websiteUrl
         );
 
         await uow.Bookmakers.AddAsync(newBookmaker);

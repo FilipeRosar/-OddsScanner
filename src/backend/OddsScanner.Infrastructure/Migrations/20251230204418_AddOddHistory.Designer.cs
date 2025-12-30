@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using OddsScanner.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using OddsScanner.Infrastructure.Persistence;
 namespace OddsScanner.Infrastructure.Migrations
 {
     [DbContext(typeof(OddsScannerDbContext))]
-    partial class OddsScannerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251230204418_AddOddHistory")]
+    partial class AddOddHistory
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

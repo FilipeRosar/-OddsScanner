@@ -18,7 +18,7 @@ namespace OddsScanner.Domain.Entities
 
         public Guid BookmakerId { get; private set; }
         public Bookmaker Bookmaker { get; private set; }
-
+        public ICollection<OddHistory> History { get; private set; } = new List<OddHistory>();
         public Odd(decimal value, string marketName, string selection, Guid matchId, Guid bookmakerId)
         {
             if (value <= 1) throw new ArgumentException("Odd deve ser maior que 1.0");

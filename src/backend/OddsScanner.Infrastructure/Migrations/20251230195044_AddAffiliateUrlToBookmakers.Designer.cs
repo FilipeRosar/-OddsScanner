@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using OddsScanner.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using OddsScanner.Infrastructure.Persistence;
 namespace OddsScanner.Infrastructure.Migrations
 {
     [DbContext(typeof(OddsScannerDbContext))]
-    partial class OddsScannerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251230195044_AddAffiliateUrlToBookmakers")]
+    partial class AddAffiliateUrlToBookmakers
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -123,32 +126,6 @@ namespace OddsScanner.Infrastructure.Migrations
                     b.ToTable("Odds");
                 });
 
-            modelBuilder.Entity("OddsScanner.Domain.Entities.OddHistory", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("OddId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("RecordedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal>("Value")
-                        .HasPrecision(10, 2)
-                        .HasColumnType("numeric(10,2)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OddId", "RecordedAt");
-
-                    b.ToTable("OddHistories");
-                });
-
             modelBuilder.Entity("OddsScanner.Domain.Entities.Subscriber", b =>
                 {
                     b.Property<Guid>("Id")
@@ -224,17 +201,6 @@ namespace OddsScanner.Infrastructure.Migrations
                     b.Navigation("Match");
                 });
 
-            modelBuilder.Entity("OddsScanner.Domain.Entities.OddHistory", b =>
-                {
-                    b.HasOne("OddsScanner.Domain.Entities.Odd", "Odd")
-                        .WithMany("History")
-                        .HasForeignKey("OddId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Odd");
-                });
-
             modelBuilder.Entity("OddsScanner.Domain.Entities.Surebet", b =>
                 {
                     b.HasOne("OddsScanner.Domain.Entities.Match", "Match")
@@ -251,11 +217,6 @@ namespace OddsScanner.Infrastructure.Migrations
                     b.Navigation("Odds");
 
                     b.Navigation("Surebets");
-                });
-
-            modelBuilder.Entity("OddsScanner.Domain.Entities.Odd", b =>
-                {
-                    b.Navigation("History");
                 });
 #pragma warning restore 612, 618
         }

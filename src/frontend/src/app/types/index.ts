@@ -1,8 +1,11 @@
 export interface Odd {
   bookmakerName: string;
   value: number;
-  selection: string; 
+  selection: string;
   bookmakerUrl: string;
+  affiliateUrl?: string;
+  history?: { value: number }[]; 
+  dropPercent?: number; 
 }
 
 export interface Match {

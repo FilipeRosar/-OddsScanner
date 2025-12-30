@@ -10,5 +10,6 @@ namespace OddsScanner.Application.Interfaces
     public interface INotificationService
     {
         Task SendSurebetAlertAsync(string homeTeam, string awayTeam, decimal profitPercent);
+        Task SendDroppingOddsAlertAsync(string homeTeam, string awayTeam, string selection, decimal dropPercent, string bookmaker);
     }
 }

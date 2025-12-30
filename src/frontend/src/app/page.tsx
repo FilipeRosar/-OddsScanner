@@ -1,7 +1,8 @@
+// app/page.tsx
 import { Match } from "@/app/types";
 import MatchList from "@/app/components/MatchList";
 import Link from "next/link";
-import { Bell } from "lucide-react"; // ícone de sino
+import { Bell, Goal } from "lucide-react"; // ← Goal, não Football
 
 async function getMatches(): Promise<Match[]> {
   try {
@@ -23,41 +24,38 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Header */}
       <header className="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">⚽</span>
+          {/* Logo */}
+          <Link href="/" className="flex items-center gap-3">
+            <Goal className="w-10 h-10 text-indigo-600" strokeWidth={2} />
             <h1 className="text-2xl font-black tracking-tight">
-              Odds<span className="text-indigo-600">Scanner</span>
+              <span className="text-slate-400">Odds</span>
+              <span className="text-indigo-600">Scanner</span>
             </h1>
-          </div>
+          </Link>
 
           <div className="flex items-center gap-6">
-            {/* Contador de jogos ao vivo */}
             <div className="hidden sm:flex items-center gap-2 px-4 py-1.5 bg-green-100 text-green-700 rounded-full text-sm font-bold">
               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
               Ao Vivo
             </div>
 
-            {/* Contador de jogos */}
             <div className="text-sm text-slate-600">
               <strong className="text-indigo-600 font-bold">{matches.length}</strong> jogos monitorados
             </div>
 
-            {/* Botão de Alertas */}
             <Link
-                href="/alertas" 
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-lg flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
-              >
-                <Bell className="w-5 h-5" />
-                Alertas Grátis
-              </Link>
+              href="/alertas"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-lg flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
+            >
+              <Bell className="w-5 h-5" />
+              Alertas Grátis
+            </Link>
           </div>
         </div>
       </header>
 
-      {/* Conteúdo principal */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="mb-10 text-center">
           <h2 className="text-3xl font-bold text-slate-900 mb-4">

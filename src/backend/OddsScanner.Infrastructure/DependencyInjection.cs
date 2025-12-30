@@ -1,7 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http;
 using OddsScanner.Application.Interfaces;
+using OddsScanner.Application.Services;
 using OddsScanner.Domain.Interfaces;
 using OddsScanner.Infrastructure.Persistence;
 using OddsScanner.Infrastructure.Repositories;
@@ -16,9 +18,9 @@ namespace OddsScanner.Infrastructure
             var connectionString = configuration.GetConnectionString("DefaultConnection");
 
             services.AddDbContext<OddsScannerDbContext>(options =>
-            options.UseNpgsql(
-                configuration.GetConnectionString("DefaultConnection"),
-                b => b.MigrationsAssembly(typeof(OddsScannerDbContext).Assembly.FullName)));
+                options.UseNpgsql(
+                    configuration.GetConnectionString("DefaultConnection"),
+                    b => b.MigrationsAssembly(typeof(OddsScannerDbContext).Assembly.FullName)));
 
             services.AddStackExchangeRedisCache(options =>
             {
@@ -26,8 +28,12 @@ namespace OddsScanner.Infrastructure
             });
 
             services.AddScoped<ICacheService, RedisCacheService>();
-            services.AddScoped<IMatchService, Application.Services.MatchService>();
             services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+            services.AddHttpClient();
+
+            services.AddScoped<IMatchService, OddsScanner.Application.Services.MatchService>();
+            services.AddSingleton<INotificationService, NotificationService>();
             return services;
         }
     }

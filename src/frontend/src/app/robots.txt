@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+
+# Diretórios permitidos
+Allow: /surebets
+Allow: /value-bets
+Allow: /alertas
+
+# Bloqueia páginas internas
+Disallow: /api/
+Disallow: /_next/
+
+# Sitemap
+Sitemap: https://odds-scanner.vercel.app/sitemap.xml
+
+# Crawl delay opcional (evita sobrecarga)
+Crawl-delay: 10

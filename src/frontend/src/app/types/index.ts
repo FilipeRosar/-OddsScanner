@@ -4,7 +4,7 @@ export interface Odd {
   selection: string;
   bookmakerUrl: string;
   affiliateUrl?: string;
-  history?: { value: number }[]; 
+  history?: { value: number; recordAt: string }[]; 
   dropPercent?: number; 
 }
 

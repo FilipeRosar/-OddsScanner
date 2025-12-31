@@ -1,11 +1,11 @@
-// app/page.tsx
 import { Match } from "@/app/types";
 import MatchList from "@/app/components/MatchList";
 import Link from "next/link";
-import { Bell, Goal } from "lucide-react"; // ← Goal, não Football
+import { Bell, Goal } from "lucide-react";
 
 async function getMatches(): Promise<Match[]> {
   try {
+    // Nota: Em produção, substitua localhost pela URL da sua API hospedada
     const res = await fetch("http://localhost:5175/api/matches", {
       cache: "no-store",
       next: { revalidate: 30 },
@@ -22,17 +22,41 @@ async function getMatches(): Promise<Match[]> {
 export default async function Home() {
   const matches = await getMatches();
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    "name": "Lista de Partidas e Odds em Tempo Real",
+    "itemListElement": matches.slice(0, 15).map((match, index) => ({
+      "@type": "ListItem",
+      "position": index + 1,
+      "item": {
+        "@type": "SportsEvent",
+        "name": `${match.homeTeam} vs ${match.awayTeam}`,
+        "startDate": match.startTime,
+        "homeTeam": { "@type": "SportsTeam", "name": match.homeTeam },
+        "awayTeam": { "@type": "SportsTeam", "name": match.awayTeam },
+        "sport": "Soccer"
+      }
+    }))
+  };
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      {/* Script de SEO Técnico */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
       <header className="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          {/* Logo */}
+          {/* Logo - Semântica: Div ou Span, para deixar o H1 para o conteúdo principal */}
           <Link href="/" className="flex items-center gap-3">
             <Goal className="w-10 h-10 text-indigo-600" strokeWidth={2} />
-            <h1 className="text-2xl font-black tracking-tight">
+            <div className="text-2xl font-black tracking-tight">
               <span className="text-slate-400">Odds</span>
               <span className="text-indigo-600">Scanner</span>
-            </h1>
+            </div>
           </Link>
 
           <div className="flex items-center gap-6">
@@ -58,11 +82,12 @@ export default async function Home() {
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="mb-10 text-center">
-          <h2 className="text-3xl font-bold text-slate-900 mb-4">
+          {/* SEO: Título Principal H1 da Página */}
+          <h1 className="text-3xl font-bold text-slate-900 mb-4">
             Mercado de Apostas em Tempo Real
-          </h2>
+          </h1>
           <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-            Encontre as melhores odds, value bets e oportunidades de lucro garantido com surebets.
+            Encontre as melhores odds, value bets e oportunidades de lucro garantido com nosso scanner de arbitragem.
           </p>
         </div>
 

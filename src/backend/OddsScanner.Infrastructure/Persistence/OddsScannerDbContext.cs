@@ -25,6 +25,10 @@ namespace OddsScanner.Infrastructure.Persistence
                 entity.Property(e => e.HomeTeam).IsRequired().HasMaxLength(100);
                 entity.Property(e => e.AwayTeam).IsRequired().HasMaxLength(100);
                 entity.Property(e => e.League).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.StartTime).IsRequired();
+
+                entity.Property(e => e.AvgGoals).HasPrecision(5, 2);
+                entity.Property(e => e.AvgCorners).HasPrecision(5, 2);
 
                 entity.HasMany(m => m.Odds)
                       .WithOne(o => o.Match)
@@ -35,6 +39,36 @@ namespace OddsScanner.Infrastructure.Persistence
                       .WithOne(s => s.Match)
                       .HasForeignKey(s => s.MatchId)
                       .OnDelete(DeleteBehavior.Cascade);
+
+  
+                entity.OwnsMany(e => e.HeadToHead, h =>
+                {
+                    h.ToTable("MatchHeadToHead");
+                    h.WithOwner().HasForeignKey("MatchId");
+                    h.Property<int>("Id"); 
+                    h.HasKey("Id");
+                    h.Property(x => x.Winner).HasMaxLength(50);
+                });
+
+                entity.OwnsMany(e => e.HomeForm, f =>
+                {
+                    f.ToTable("MatchHomeForm");
+                    f.WithOwner().HasForeignKey("MatchId");
+                    f.Property<int>("Id");
+                    f.HasKey("Id");
+                    f.Property(x => x.Result).HasMaxLength(1); 
+                    f.Property(x => x.Opponent).HasMaxLength(100);
+                });
+
+                entity.OwnsMany(e => e.AwayForm, f =>
+                {
+                    f.ToTable("MatchAwayForm");
+                    f.WithOwner().HasForeignKey("MatchId");
+                    f.Property<int>("Id");
+                    f.HasKey("Id");
+                    f.Property(x => x.Result).HasMaxLength(1); 
+                    f.Property(x => x.Opponent).HasMaxLength(100);
+                });
             });
 
             modelBuilder.Entity<Bookmaker>(entity =>

@@ -12,27 +12,30 @@ public class Worker : BackgroundService
     private readonly ILogger<Worker> _logger;
     private readonly IServiceProvider _serviceProvider;
     private readonly OddsApiClient _apiClient;
-
+    private readonly FootballApiClient _footballApiClient;
     public Worker(
         ILogger<Worker> logger,
         IServiceProvider serviceProvider,
-        OddsApiClient apiClient)
+        OddsApiClient apiClient,
+        FootballApiClient footballApiClient)
     {
         _logger = logger;
         _serviceProvider = serviceProvider;
         _apiClient = apiClient;
+        _footballApiClient = footballApiClient;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var interval = TimeSpan.FromMinutes(30);
-
+        await _footballApiClient.InitializeMappingAsync();
         while (!stoppingToken.IsCancellationRequested)
         {
             _logger.LogInformation("🌍 Buscando dados reais da The-Odds-Api...");
 
             try
             {
+
                 var allExternalMatches = await _apiClient.GetUpcomingMatchesAsync();
 
                 if (!allExternalMatches.Any())
@@ -140,15 +143,16 @@ public class Worker : BackgroundService
                             anyChange = true;
                         }
                     }
-
                     if (anyChange && existingMatch != null)
                     {
                         _logger.LogInformation($"🔄 Odds/Surebets atualizadas: {matchEntity.HomeTeam} x {matchEntity.AwayTeam}");
                     }
+                    await _footballApiClient.EnrichMatchStatsAsync(matchEntity);
                 }
 
                 await unitOfWork.CommitAsync();
                 await cacheService.RemoveAsync("matches_all");
+
                 _logger.LogInformation("✅ Sincronização completa e cache limpo!");
             }
             catch (Exception ex)

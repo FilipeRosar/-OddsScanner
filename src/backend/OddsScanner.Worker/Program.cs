@@ -12,6 +12,7 @@ builder.Services.AddHttpClient();
 
 // Clients específicos
 builder.Services.AddHttpClient<OddsApiClient>();
+builder.Services.AddHttpClient<FootballApiClient>();
 
 // Worker
 builder.Services.AddHostedService<Worker>();

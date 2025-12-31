@@ -24,7 +24,7 @@ public class NotificationService : INotificationService
         _oneSignalAppId = config["OneSignal:AppId"] ?? throw new ArgumentNullException("OneSignal:AppId não configurado");
         _oneSignalApiKey = config["OneSignal:ApiKey"] ?? throw new ArgumentNullException("OneSignal:ApiKey não configurado");
         _resendApiKey = config["Resend:ApiKey"] ?? throw new ArgumentNullException("Resend:ApiKey não configurado");
-        _siteUrl = config["SiteUrl"] ?? "https://seu-odds-scanner.com";
+        _siteUrl = config["SiteUrl"] ?? "https://odds-scanner.vercel.app";
     }
 
     public async Task SendDroppingOddsAlertAsync(string homeTeam, string awayTeam, string selection, decimal dropPercent, string bookmaker)
@@ -52,8 +52,8 @@ public class NotificationService : INotificationService
                 headings = new { en = "🔥 DROPPING ODDS!" },
                 contents = new { en = shortMessage },
                 url = _siteUrl,
-                large_icon = "https://seu-site.com/icon-512.png",
-                chrome_web_icon = "https://seu-site.com/icon-192.png"
+                large_icon = "https://odds-scanner.vercel.app/icon-512.png",
+                chrome_web_icon = "https://odds-scanner.vercel.app/icon-192.png"
             };
 
             var pushContent = new StringContent(JsonSerializer.Serialize(pushPayload), Encoding.UTF8, "application/json");
@@ -81,8 +81,8 @@ public class NotificationService : INotificationService
             // 2. Email via Resend
             var emailPayload = new
             {
-                from = "alertas@seuodds scanner.com",
-                to = new[] { "seu-email@gmail.com" }, // substitua por lista real ou banco
+                from = "OddsScanner Alertas <alertas@oddsscanner.com.br>",
+                to = new[] { "filiperosa0312@gmail.com" }, 
                 subject = "🔥 Dropping Odds Detectada!",
                 html = $"""
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px; background: #1a1a1a; color: #e0e0e0;">
@@ -142,8 +142,8 @@ public class NotificationService : INotificationService
                 headings = new { en = "🚨 SUREBET ENCONTRADA!" },
                 contents = new { en = shortMessage },
                 url = _siteUrl,
-                large_icon = "https://seu-site.com/icon-512.png", 
-                chrome_web_icon = "https://seu-site.com/icon-192.png"
+                large_icon = "https://odds-scanner.vercel.app/icon-512.png", 
+                chrome_web_icon = "https://odds-scanner.vercel.app/icon-192.png"
             };
 
             var pushContent = new StringContent(JsonSerializer.Serialize(pushPayload), Encoding.UTF8, "application/json");
@@ -171,7 +171,7 @@ public class NotificationService : INotificationService
             // 2. Email via Resend (para lista de inscritos ou admin)
             var emailPayload = new
             {
-                from = "alertas@seuodds scanner.com",
+                from = "OddsScanner Alertas <alertas@oddsscanner.com.br>",
                 to = new[] { "filiperosa0312@gmail.com" }, 
                 subject = "🚨 Surebet Encontrada!",
                 html = $"""

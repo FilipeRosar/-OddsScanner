@@ -15,6 +15,7 @@ import {
   DialogDescription,
 } from "@/app/components/ui/dialog";
 import OddHistoryChart from "./OddHistoryChart";
+import MatchStatsModal from "./MatchStatsModal";
 
 interface MatchCardProps {
   match: Match;
@@ -23,6 +24,7 @@ interface MatchCardProps {
 export default function MatchCard({ match }: MatchCardProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [selectedOdd, setSelectedOdd] = useState<any>(null);
+  const [statsOpen, setStatsOpen] = useState(false);
 
   const getBestOdd = (selection: "Home" | "Draw" | "Away") => {
     const filtered = match.odds.filter((o) => o.selection === selection);
@@ -121,7 +123,12 @@ export default function MatchCard({ match }: MatchCardProps) {
               </div>
             </div>
 
-            <div className="text-sm font-bold text-gray-400 uppercase tracking-widest mx-4">VS</div>
+            <div 
+              className="text-lg font-black text-indigo-600 uppercase tracking-widest mx-4 cursor-pointer hover:text-indigo-800 transition-colors"
+              onClick={() => setStatsOpen(true)}
+            >
+              VS
+            </div>
 
             {/* Time Visitante */}
             <div className="flex items-center gap-3 flex-1">
@@ -214,8 +221,18 @@ export default function MatchCard({ match }: MatchCardProps) {
               }
             />
           )}
+          <MatchStatsModal 
+          match={match} 
+          open={statsOpen} 
+          onOpenChange={setStatsOpen} 
+        />
         </DialogContent>
       </Dialog>
+      <MatchStatsModal 
+        match={match} 
+        open={statsOpen} 
+        onOpenChange={setStatsOpen} 
+      />
     </>
   );
 }

@@ -17,4 +17,14 @@ export interface Match {
   isLive: boolean;
   odds: Odd[];
   surebetProfit?: number;
+  headToHead?: {
+    date: string;
+    homeScore: number;
+    awayScore: number;
+    winner: "home" | "away" | "draw";
+  }[];
+  homeForm?: { result: "W" | "D" | "L"; opponent: string }[];
+  awayForm?: { result: "W" | "D" | "L"; opponent: string }[];
+  avgGoals: number;
+  avgCorners: number;
 }

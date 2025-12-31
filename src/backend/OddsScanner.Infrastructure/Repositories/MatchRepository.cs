@@ -2,11 +2,6 @@
 using OddsScanner.Domain.Entities;
 using OddsScanner.Domain.Interfaces;
 using OddsScanner.Infrastructure.Persistence;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace OddsScanner.Infrastructure.Repositories
 {
@@ -22,25 +17,29 @@ namespace OddsScanner.Infrastructure.Repositories
         public async Task<Match?> GetByIdAsync(Guid id)
         {
             return await _context.Matches
-                .Include(m => m.Odds) 
-                .ThenInclude(o => o.Bookmaker) 
+                .Include(m => m.Odds)
+                    .ThenInclude(o => o.Bookmaker)
+                .Include(m => m.Surebets)
                 .FirstOrDefaultAsync(m => m.Id == id);
         }
 
         public async Task<List<Match>> GetAllAsync()
         {
             return await _context.Matches
-                .AsNoTracking() 
-                .Include(m => m.Odds)              
-                    .ThenInclude(o => o.Bookmaker)  
+                .AsNoTracking()
+                .Include(m => m.Odds)
+                    .ThenInclude(o => o.Bookmaker)
+                .Include(m => m.Surebets)
                 .OrderBy(m => m.StartTime)
                 .ToListAsync();
         }
+
         public async Task<List<Match>> GetAllForUpdateAsync()
         {
             return await _context.Matches
                 .Include(m => m.Odds)
-                .ThenInclude(o => o.Bookmaker)
+                    .ThenInclude(o => o.Bookmaker)
+                .Include(m => m.Surebets)
                 .ToListAsync();
         }
 
@@ -48,19 +47,21 @@ namespace OddsScanner.Infrastructure.Repositories
         {
             await _context.Matches.AddAsync(match);
         }
+
         public async Task<List<Match>> GetAllWithOddsAndBookmakersAsync()
         {
             return await _context.Matches
                 .AsNoTracking()
                 .Include(m => m.Odds)
-                    .ThenInclude(o => o.Bookmaker)
+                    .ThenInclude(o => o.Bookmaker) 
+                .Include(m => m.Surebets)
                 .OrderBy(m => m.StartTime)
                 .ToListAsync();
         }
+
         public async Task UpdateAsync(Match match)
         {
             _context.Matches.Update(match);
-            await Task.CompletedTask;
         }
 
         public async Task SaveChangesAsync()

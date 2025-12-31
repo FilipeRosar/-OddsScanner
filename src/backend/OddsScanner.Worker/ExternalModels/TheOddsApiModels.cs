@@ -16,6 +16,8 @@ namespace OddsScanner.Worker.ExternalModels
         [JsonPropertyName("home_team")] public string HomeTeam { get; set; } = string.Empty;
         [JsonPropertyName("away_team")] public string AwayTeam { get; set; } = string.Empty;
         [JsonPropertyName("bookmakers")] public List<TheOddsApiBookmaker> Bookmakers { get; set; } = new();
+
+        [JsonPropertyName("league")] public string League { get; set; } = string.Empty;
     }
 
     public class TheOddsApiBookmaker

@@ -67,7 +67,7 @@ public class Worker : BackgroundService
                         homeTeam: extMatch.HomeTeam,
                         awayTeam: extMatch.AwayTeam,
                         startTime: extMatch.CommenceTime.ToUniversalTime(),
-                        league: "Brasileirão Série A"
+                        league: extMatch.League
                     );
 
                     if (existingMatch == null)
@@ -199,9 +199,10 @@ public class Worker : BackgroundService
 
                     if (dropPercent > 10)
                     {
-                        _logger.LogWarning($"DROPPING ODDS: {match.HomeTeam} x {match.AwayTeam} ({selection}) caiu {dropPercent:F1}% na {existingOdd.Bookmaker.Name}");
+                        var bookmakerName = existingOdd.Bookmaker?.Name ?? "Casa Desconhecida";
+                        _logger.LogWarning($"DROPPING ODDS: {match.HomeTeam} x {match.AwayTeam} ({selection}) caiu {dropPercent:F1}% na {bookmakerName}");
 
-                        if (dropPercent > 15)
+                        if (dropPercent > 15 && existingOdd.Bookmaker != null)
                         {
                             await notificationService.SendDroppingOddsAlertAsync(
                                 match.HomeTeam,

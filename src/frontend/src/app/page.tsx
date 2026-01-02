@@ -5,9 +5,7 @@ import { Bell, Goal } from "lucide-react";
 
 async function getMatches(): Promise<Match[]> {
   try {
-    // Nota: Em produção, substitua localhost pela URL da sua API hospedada
     const res = await fetch("http://localhost:5175/api/matches", {
-      cache: "no-store",
       next: { revalidate: 30 },
     });
 
@@ -19,8 +17,15 @@ async function getMatches(): Promise<Match[]> {
   }
 }
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: { league?: string };
+}) {
   const matches = await getMatches();
+
+  // Lê o parâmetro ?league= da URL (vindo dos redirects)
+  const initialLeague = searchParams.league || "all";
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -42,7 +47,6 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Script de SEO Técnico */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -50,7 +54,6 @@ export default async function Home() {
 
       <header className="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          {/* Logo - Semântica: Div ou Span, para deixar o H1 para o conteúdo principal */}
           <Link href="/" className="flex items-center gap-3">
             <Goal className="w-10 h-10 text-indigo-600" strokeWidth={2} />
             <div className="text-2xl font-black tracking-tight">
@@ -82,16 +85,16 @@ export default async function Home() {
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="mb-10 text-center">
-          {/* SEO: Título Principal H1 da Página */}
-          <h1 className="text-3xl font-bold text-slate-900 mb-4">
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 mb-4">
             Mercado de Apostas em Tempo Real
           </h1>
-          <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-            Encontre as melhores odds, value bets e oportunidades de lucro garantido com nosso scanner de arbitragem.
+          <p className="text-lg text-slate-600 max-w-3xl mx-auto">
+            Encontre as melhores odds, value bets, surebets e oportunidades de lucro garantido com nosso scanner de arbitragem.
           </p>
         </div>
 
-        <MatchList initialMatches={matches} />
+        {/* Passa o initialLeague para o MatchList aplicar o filtro automaticamente */}
+        <MatchList initialMatches={matches} initialLeague={initialLeague} />
       </section>
     </main>
   );

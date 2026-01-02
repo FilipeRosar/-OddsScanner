@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using OddsScanner.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using OddsScanner.Infrastructure.Persistence;
 namespace OddsScanner.Infrastructure.Migrations
 {
     [DbContext(typeof(OddsScannerDbContext))]
-    partial class OddsScannerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260102142346_AddLogo")]
+    partial class AddLogo
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -75,8 +78,7 @@ namespace OddsScanner.Infrastructure.Migrations
 
                     b.Property<string>("AwayTeamLogo")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasAnnotation("Relational:JsonPropertyName", "away_team_logo");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");

@@ -1,9 +1,16 @@
-// src/app/components/MatchStatsModal.tsx
 "use client";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/app/components/ui/dialog";
-import { Trophy, TrendingUp, Target, Shield } from "lucide-react";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle,
+  DialogDescription 
+} from "@/app/components/ui/dialog";
+import { Trophy, TrendingUp, Target, Shield, Zap } from "lucide-react";
 import { Match } from "@/app/types";
+import Image from "next/image";
+import { getTeamLogoUrl } from "@/utils/teamLogos";
 
 interface MatchStatsModalProps {
   match: Match;
@@ -12,161 +19,138 @@ interface MatchStatsModalProps {
 }
 
 export default function MatchStatsModal({ match, open, onOpenChange }: MatchStatsModalProps) {
+  // Fallbacks de segurança para URLs de imagem
+  const homeLogo = getTeamLogoUrl(match.homeTeam, match.homeTeamLogo) || null;
+  const awayLogo = getTeamLogoUrl(match.awayTeam, match.awayTeamLogo) || null;
+
   const getResultColor = (result: "W" | "D" | "L") => {
     switch (result) {
-      case "W": return "bg-emerald-100 text-emerald-800 border-2 border-emerald-300";
-      case "D": return "bg-slate-100 text-slate-800 border-2 border-slate-300";
-      case "L": return "bg-red-100 text-red-800 border-2 border-red-300";
-      default: return "bg-gray-100 text-gray-800 border-2 border-gray-300";
-    }
-  };
-
-  const getWinnerText = (winner: "home" | "away" | "draw") => {
-    switch (winner) {
-      case "home": return match.homeTeam;
-      case "away": return match.awayTeam;
-      case "draw": return "Empate";
-      default: return "Empate";
+      case "W": return "bg-emerald-500 text-white shadow-lg shadow-emerald-200/50";
+      case "D": return "bg-slate-400 text-white shadow-lg shadow-slate-200/50";
+      case "L": return "bg-rose-500 text-white shadow-lg shadow-rose-200/50";
+      default: return "bg-gray-100 text-gray-400";
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-900">
-        <DialogHeader>
-          <DialogTitle className="text-2xl md:text-3xl font-black text-center text-slate-900 dark:text-slate-100">
-            Estatísticas: {match.homeTeam} vs {match.awayTeam}
-          </DialogTitle>
+      <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto bg-slate-50 dark:bg-slate-950 p-0 border-none shadow-2xl">
+        
+        {/* CORREÇÃO ACESSIBILIDADE: Header sempre com Title e Description */}
+        <DialogHeader className="sr-only">
+          <DialogTitle>Estatísticas: {match.homeTeam} vs {match.awayTeam}</DialogTitle>
+          <DialogDescription>Dados de performance, H2H e médias de gols/escanteios.</DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
-          {/* Head-to-Head */}
-          <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 rounded-2xl p-6 shadow-inner">
-            <h3 className="text-xl font-black flex items-center gap-3 mb-6 text-slate-800 dark:text-slate-200">
-              <Trophy className="w-7 h-7 text-yellow-600" />
-              Head-to-Head (últimos jogos)
-            </h3>
-            {match.headToHead && match.headToHead.length > 0 ? (
-              <div className="space-y-4">
-                {match.headToHead.map((game, i) => (
-                  <div key={i} className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-md flex items-center justify-between">
-                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
-                      {new Date(game.date).toLocaleDateString('pt-BR')}
-                    </span>
-                    <div className="flex items-center gap-6 font-black text-lg">
-                      <span className="text-blue-600">{game.homeScore}</span>
-                      <span className="text-slate-400">x</span>
-                      <span className="text-red-600">{game.awayScore}</span>
-                    </div>
-                    <span className="text-sm font-bold px-3 py-1 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
-                      {getWinnerText(game.winner)}
-                    </span>
-                  </div>
-                ))}
+        {/* Topo Visual (Hero Section) */}
+        <div className="bg-slate-900 p-8 text-white relative overflow-hidden">
+          <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/asfalt-dark.png')]" />
+          <div className="relative z-10 flex items-center justify-around w-full">
+            
+            {/* Home Team */}
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-16 h-16 md:w-20 md:h-20 bg-white rounded-2xl p-2 shadow-2xl flex items-center justify-center">
+                {homeLogo ? (
+                  <Image src={homeLogo} alt={match.homeTeam} width={80} height={80} className="object-contain" unoptimized />
+                ) : (
+                  <Shield className="w-10 h-10 text-slate-300" />
+                )}
               </div>
-            ) : (
-              <p className="text-center text-slate-500 dark:text-slate-400 py-12">
-                Sem histórico disponível
-              </p>
-            )}
-          </div>
+              <span className="text-sm font-black uppercase tracking-tighter text-center">{match.homeTeam}</span>
+            </div>
 
-          {/* Forma recente */}
-          <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30 rounded-2xl p-6 shadow-inner">
-            <h3 className="text-xl font-black flex items-center gap-3 mb-6 text-slate-800 dark:text-slate-200">
-              <TrendingUp className="w-7 h-7 text-indigo-600" />
-              Forma Recente (últimos 5 jogos)
-            </h3>
-            <div className="space-y-8">
-              <div>
-                <p className="font-black text-xl text-blue-600 mb-3">{match.homeTeam}</p>
-                <div className="flex gap-3 justify-center">
-                  {match.homeForm && match.homeForm.length > 0 ? (
-                    match.homeForm.map((game, i) => (
-                      <div
-                        key={i}
-                        className={`w-12 h-12 rounded-full flex items-center justify-center font-black text-lg shadow-lg ${getResultColor(game.result)}`}
-                      >
-                        {game.result}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center text-slate-500 dark:text-slate-400">
-                      Sem dados
-                    </div>
-                  )}
-                </div>
-              </div>
+            <div className="flex flex-col items-center opacity-50">
+              <span className="text-xs font-black mb-1">VS</span>
+              <Zap className="w-5 h-5 text-yellow-400 fill-yellow-400" />
+            </div>
 
-              <div>
-                <p className="font-black text-xl text-red-600 mb-3">{match.awayTeam}</p>
-                <div className="flex gap-3 justify-center">
-                  {match.awayForm && match.awayForm.length > 0 ? (
-                    match.awayForm.map((game, i) => (
-                      <div
-                        key={i}
-                        className={`w-12 h-12 rounded-full flex items-center justify-center font-black text-lg shadow-lg ${getResultColor(game.result)}`}
-                      >
-                        {game.result}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center text-slate-500 dark:text-slate-400">
-                      Sem dados
-                    </div>
-                  )}
-                </div>
+            {/* Away Team */}
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-16 h-16 md:w-20 md:h-20 bg-white rounded-2xl p-2 shadow-2xl flex items-center justify-center">
+                {awayLogo ? (
+                  <Image src={awayLogo} alt={match.awayTeam} width={80} height={80} className="object-contain" unoptimized />
+                ) : (
+                  <Shield className="w-10 h-10 text-slate-300" />
+                )}
               </div>
+              <span className="text-sm font-black uppercase tracking-tighter text-center">{match.awayTeam}</span>
             </div>
           </div>
         </div>
 
-        {/* Médias reais do backend */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-10 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/40 dark:to-purple-900/40 rounded-2xl p-8 shadow-inner">
-          <div className="text-center">
-            <Target className="w-12 h-12 mx-auto text-indigo-600 mb-3" />
-            <p className="text-4xl font-black text-indigo-800 dark:text-indigo-300">
-              {match.avgGoals != null && !isNaN(match.avgGoals)
-                ? Number(match.avgGoals).toFixed(1)
-                : "-"}
-            </p>
-            <p className="text-sm font-bold text-slate-600 dark:text-slate-400 mt-1">
-              Média de gols por jogo
-            </p>
+        <div className="p-6 md:p-8 space-y-8">
+          {/* Métricas: Gols, Cantos, Over, BTTS */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { label: 'Gols / Jogo', val: match.avgGoals, icon: Target, color: 'text-indigo-600' },
+              { label: 'Escanteios', val: match.avgCorners, icon: Shield, color: 'text-purple-600' },
+              { label: 'Over 2.5', val: (match.avgGoals || 0) > 2.5 ? 'Provável' : 'Baixo', icon: TrendingUp, color: 'text-emerald-600' },
+              { label: 'Ambos Marcam', val: (match.avgGoals || 0) > 2.7 ? 'Sim' : 'Talvez', icon: Zap, color: 'text-orange-600' },
+            ].map((stat, i) => (
+              <div key={i} className="bg-white p-5 rounded-3xl border border-slate-100 flex flex-col items-center text-center shadow-sm">
+                <stat.icon className={`w-5 h-5 ${stat.color} mb-2`} />
+                <span className="text-2xl font-black text-slate-800">
+                  {stat.val && stat.val !== 0 ? (typeof stat.val === 'number' ? stat.val.toFixed(1) : stat.val) : '--'}
+                </span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{stat.label}</span>
+              </div>
+            ))}
           </div>
 
-          <div className="text-center">
-            <Shield className="w-12 h-12 mx-auto text-purple-600 mb-3" />
-            <p className="text-4xl font-black text-purple-800 dark:text-purple-300">
-              {match.avgCorners != null && !isNaN(match.avgCorners)
-                ? Number(match.avgCorners).toFixed(1)
-                : "-"}
-            </p>
-            <p className="text-sm font-bold text-slate-600 dark:text-slate-400 mt-1">
-              Média de escanteios
-            </p>
-          </div>
-
-          <div className="text-center">
-            <TrendingUp className="w-12 h-12 mx-auto text-emerald-600 mb-3" />
-            <p className="text-2xl font-black text-emerald-800 dark:text-emerald-300">
-              Over 2.5
-            </p>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-              {match.avgGoals > 2.5 ? "comum (~65%)" : "raro (~45%)"}
-            </p>
-          </div>
-
-          <div className="text-center">
-            <div className="w-12 h-12 mx-auto bg-orange-100 dark:bg-orange-900/50 rounded-full flex items-center justify-center mb-3">
-              <span className="text-2xl font-black text-orange-600 dark:text-orange-400">BTTS</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Card H2H */}
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+              <h3 className="font-black text-slate-800 flex items-center gap-2 mb-4">
+                <Trophy className="w-5 h-5 text-amber-500" /> CONFRONTOS DIRETOS
+              </h3>
+              <div className="space-y-3">
+                {match.headToHead && match.headToHead.length > 0 ? (
+                  match.headToHead.slice(0, 5).map((game, i) => (
+                    <div key={i} className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                      <span className="text-[10px] font-bold text-slate-400">{new Date(game.date).getFullYear()}</span>
+                      <div className="flex items-center gap-3 font-mono font-black text-slate-700">
+                        <span>{game.homeScore}</span>
+                        <span className="text-slate-300">-</span>
+                        <span>{game.awayScore}</span>
+                      </div>
+                      <span className={`text-[10px] font-black uppercase ${game.winner === 'draw' ? 'text-slate-400' : 'text-indigo-600'}`}>
+                        {game.winner === 'draw' ? 'Empate' : 'Vitória'}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-10 opacity-40">Sem histórico recente</div>
+                )}
+              </div>
             </div>
-            <p className="text-2xl font-black text-orange-800 dark:text-orange-300">
-              Ambos marcam
-            </p>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-              {match.avgGoals > 2.7 ? "frequente (~70%)" : "moderado (~50%)"}
-            </p>
+
+            {/* Card Forma Recente */}
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+              <h3 className="font-black text-slate-800 flex items-center gap-2 mb-4">
+                <TrendingUp className="w-5 h-5 text-indigo-500" /> ÚLTIMOS RESULTADOS
+              </h3>
+              <div className="space-y-6">
+                {[
+                  { name: match.homeTeam, form: match.homeForm, color: 'text-blue-600' },
+                  { name: match.awayTeam, form: match.awayForm, color: 'text-rose-600' }
+                ].map((team, idx) => (
+                  <div key={idx}>
+                    <p className={`text-[10px] font-black uppercase mb-2 ${team.color}`}>{team.name}</p>
+                    <div className="flex gap-2">
+                      {team.form && team.form.length > 0 ? (
+                        team.form.map((f, i) => (
+                          <div key={i} className={`w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-black transition-transform hover:scale-110 ${getResultColor(f.result)}`}>
+                            {f.result}
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-300 text-[10px] italic">Sem dados de forma recente</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </DialogContent>

@@ -16,6 +16,8 @@ export interface Match {
   league: string;
   isLive: boolean;
   odds: Odd[];
+  homeTeamLogo?: string; 
+  awayTeamLogo?: string;
   surebetProfit?: number;
   headToHead?: {
     date: string;

@@ -28,14 +28,16 @@ public class Worker : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var interval = TimeSpan.FromMinutes(30);
+
+        // Inicializa o mapeamento de times, ligas e logos uma única vez (fora do loop)
         await _footballApiClient.InitializeMappingAsync();
+
         while (!stoppingToken.IsCancellationRequested)
         {
             _logger.LogInformation("🌍 Buscando dados reais da The-Odds-Api...");
 
             try
             {
-
                 var allExternalMatches = await _apiClient.GetUpcomingMatchesAsync();
 
                 if (!allExternalMatches.Any())
@@ -64,7 +66,8 @@ public class Worker : BackgroundService
                 {
                     var existingMatch = dbMatches.FirstOrDefault(m =>
                         string.Equals(m.HomeTeam, extMatch.HomeTeam, StringComparison.OrdinalIgnoreCase) &&
-                        string.Equals(m.AwayTeam, extMatch.AwayTeam, StringComparison.OrdinalIgnoreCase));
+                        string.Equals(m.AwayTeam, extMatch.AwayTeam, StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(m.League, extMatch.League, StringComparison.OrdinalIgnoreCase)); 
 
                     Match matchEntity = existingMatch ?? new Match(
                         homeTeam: extMatch.HomeTeam,
@@ -81,6 +84,7 @@ public class Worker : BackgroundService
 
                     bool anyChange = false;
 
+                    // Processamento de odds
                     foreach (var extBookmaker in extMatch.Bookmakers)
                     {
                         var h2hMarket = extBookmaker.Markets?.FirstOrDefault(m => m.Key == "h2h");
@@ -98,7 +102,7 @@ public class Worker : BackgroundService
                         }
                     }
 
-                    // Cálculo de surebet (mantido igual)
+                    // Cálculo de surebet
                     decimal? currentProfit = null;
                     var bestHome = matchEntity.Odds.Where(o => o.Selection == "Home").MaxBy(o => o.Value)?.Value ?? 0m;
                     var bestDraw = matchEntity.Odds.Where(o => o.Selection == "Draw").MaxBy(o => o.Value)?.Value ?? 0m;
@@ -107,11 +111,9 @@ public class Worker : BackgroundService
                     if (bestHome > 0 && bestDraw > 0 && bestAway > 0)
                     {
                         var arbitrage = 1 / bestHome + 1 / bestDraw + 1 / bestAway;
-
                         if (arbitrage < 0.98m)
                         {
                             currentProfit = ((1 / arbitrage) - 1) * 100;
-
                             var existingSurebet = matchEntity.Surebets.FirstOrDefault(s => s.IsActive);
 
                             if (existingSurebet == null)
@@ -119,9 +121,7 @@ public class Worker : BackgroundService
                                 var newSurebet = new Surebet(matchEntity.Id, currentProfit.Value);
                                 matchEntity.Surebets.Add(newSurebet);
                                 anyChange = true;
-
                                 _logger.LogWarning($"🚨 NOVA SUREBET DETECTADA: {matchEntity.HomeTeam} x {matchEntity.AwayTeam} → +{currentProfit:F2}% lucro garantido!");
-
                                 await notificationService.SendSurebetAlertAsync(
                                     matchEntity.HomeTeam,
                                     matchEntity.AwayTeam,
@@ -143,16 +143,18 @@ public class Worker : BackgroundService
                             anyChange = true;
                         }
                     }
+
                     if (anyChange && existingMatch != null)
                     {
                         _logger.LogInformation($"🔄 Odds/Surebets atualizadas: {matchEntity.HomeTeam} x {matchEntity.AwayTeam}");
                     }
+
+                    // Enriquecimento com estatísticas + logos (chamado uma única vez por jogo)
                     await _footballApiClient.EnrichMatchStatsAsync(matchEntity);
                 }
 
                 await unitOfWork.CommitAsync();
                 await cacheService.RemoveAsync("matches_all");
-
                 _logger.LogInformation("✅ Sincronização completa e cache limpo!");
             }
             catch (Exception ex)

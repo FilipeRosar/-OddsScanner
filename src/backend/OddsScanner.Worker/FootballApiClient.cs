@@ -2,7 +2,6 @@
 using Microsoft.Extensions.Logging;
 using OddsScanner.Domain.Entities;
 using System.Globalization;
-using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
@@ -15,8 +14,9 @@ namespace OddsScanner.Worker
         private readonly string _apiKey;
         private readonly ILogger<FootballApiClient> _logger;
 
-        // Dicionários com CaseInsensitive e chaves que serão normalizadas
+        // Caches para IDs e Logos
         private Dictionary<string, int> _teamCache = new(StringComparer.OrdinalIgnoreCase);
+        private Dictionary<string, string> _teamLogoCache = new(StringComparer.OrdinalIgnoreCase);
         private Dictionary<string, int> _leagueCache = new(StringComparer.OrdinalIgnoreCase);
 
         public FootballApiClient(HttpClient httpClient, IConfiguration configuration, ILogger<FootballApiClient> logger)
@@ -36,13 +36,19 @@ namespace OddsScanner.Worker
                 int leagueId = GetLeagueId(match.League);
                 int season = DateTime.Now.Year;
 
+                // Atribui as logos a partir do cache mapeado no InitializeMappingAsync
+                var homeLogo = GetTeamLogo(match.HomeTeam);
+                var awayLogo = GetTeamLogo(match.AwayTeam);
+
+                match.SetTeamLogos(homeLogo, awayLogo);
+
                 if (homeTeamId == 0 || awayTeamId == 0)
                 {
                     _logger.LogWarning($"Estatísticas abortadas: Time não mapeado ({match.HomeTeam} ou {match.AwayTeam})");
                     return;
                 }
 
-                // Dispara todas as requisições em paralelo para performance
+                // Chamadas em paralelo para performance
                 var h2hTask = GetHeadToHeadAsync(homeTeamId, awayTeamId, 5);
                 var homeFormTask = GetTeamFormAsync(homeTeamId, leagueId, season, 5);
                 var awayFormTask = GetTeamFormAsync(awayTeamId, leagueId, season, 5);
@@ -62,7 +68,7 @@ namespace OddsScanner.Worker
                     avgCorners
                 );
 
-                _logger.LogInformation($"✅ Estatísticas carregadas: {match.HomeTeam} x {match.AwayTeam} (Gols: {avgGoals:F1}, Cantos: {avgCorners:F1})");
+                _logger.LogInformation($"✅ Stats & Logos carregados: {match.HomeTeam} x {match.AwayTeam}");
             }
             catch (Exception ex)
             {
@@ -77,6 +83,12 @@ namespace OddsScanner.Worker
             return _teamCache.TryGetValue(normalizedInput, out int id) ? id : 0;
         }
 
+        public string? GetTeamLogo(string teamName)
+        {
+            var normalizedInput = NormalizeName(teamName);
+            return _teamLogoCache.TryGetValue(normalizedInput, out string? logo) ? logo : null;
+        }
+
         private int GetLeagueId(string leagueName)
         {
             var normalizedInput = NormalizeName(leagueName);
@@ -87,7 +99,7 @@ namespace OddsScanner.Worker
         {
             try
             {
-                _logger.LogInformation("Iniciando mapeamento automático de Ligas e Times...");
+                _logger.LogInformation("Iniciando mapeamento automático de Ligas, Times e Logos...");
 
                 // 1. Mapear Ligas
                 var leaguesJson = await SendRequestAsync("leagues");
@@ -104,8 +116,8 @@ namespace OddsScanner.Worker
                     }
                 }
 
-                // 2. Mapear Times das ligas principais (IDs da API-Football)
-                int[] activeLeagues = { 39, 71, 140, 135, 78, 61, 94 }; // Premier, Brasileirão, LaLiga, Serie A, Bunesliga, Ligue 1, Primeira Liga
+                // 2. Mapear Times e Logos das ligas principais
+                int[] activeLeagues = { 39, 71, 140, 135, 78, 61, 94 };
                 foreach (var leagueId in activeLeagues)
                 {
                     var teamsJson = await SendRequestAsync($"teams?league={leagueId}&season={DateTime.Now.Year}");
@@ -117,12 +129,19 @@ namespace OddsScanner.Worker
                             var team = element.GetProperty("team");
                             var name = team.GetProperty("name").GetString();
                             var id = team.GetProperty("id").GetInt32();
+                            var logo = team.GetProperty("logo").GetString();
+
                             if (!string.IsNullOrEmpty(name))
-                                _teamCache[NormalizeName(name)] = id;
+                            {
+                                var normalized = NormalizeName(name);
+                                _teamCache[normalized] = id;
+                                if (!string.IsNullOrEmpty(logo))
+                                    _teamLogoCache[normalized] = logo;
+                            }
                         }
                     }
                 }
-                _logger.LogInformation($"Mapeamento concluído: {_leagueCache.Count} ligas e {_teamCache.Count} times carregados.");
+                _logger.LogInformation($"Mapeamento concluído: {_leagueCache.Count} ligas e {_teamCache.Count} times com logos.");
             }
             catch (Exception ex)
             {
@@ -170,7 +189,7 @@ namespace OddsScanner.Worker
         }
         #endregion
 
-        #region Parsers de Resposta
+        #region Parsers
         private List<H2HGame> ParseH2H(string json)
         {
             using var doc = JsonDocument.Parse(json);
@@ -194,15 +213,12 @@ namespace OddsScanner.Worker
             return response.EnumerateArray().Select(fixture =>
             {
                 var teams = fixture.GetProperty("teams");
-                var goals = fixture.GetProperty("goals");
                 bool isHome = teams.GetProperty("home").GetProperty("id").GetInt32() == targetTeamId;
 
                 var homeWinner = teams.GetProperty("home").GetProperty("winner").ValueKind != JsonValueKind.Null && teams.GetProperty("home").GetProperty("winner").GetBoolean();
                 var awayWinner = teams.GetProperty("away").GetProperty("winner").ValueKind != JsonValueKind.Null && teams.GetProperty("away").GetProperty("winner").GetBoolean();
 
-                string result = "D";
-                if (isHome) result = homeWinner ? "W" : (awayWinner ? "L" : "D");
-                else result = awayWinner ? "W" : (homeWinner ? "L" : "D");
+                string result = isHome ? (homeWinner ? "W" : (awayWinner ? "L" : "D")) : (awayWinner ? "W" : (homeWinner ? "L" : "D"));
 
                 return new FormGame
                 {
@@ -217,27 +233,18 @@ namespace OddsScanner.Worker
             using var doc = JsonDocument.Parse(json);
             var res = doc.RootElement.GetProperty("response");
 
-            // Parsing Seguro de Gols
             string avgGoalsStr = "0";
             if (res.GetProperty("goals").GetProperty("for").TryGetProperty("average", out var avgNode))
-                avgGoalsStr = avgNode.GetProperty("total").GetString() ?? "0";
+                avgGoalsStr = avgNode.GetString() ?? "0";
 
             decimal avgGoals = decimal.Parse(avgGoalsStr, CultureInfo.InvariantCulture);
 
-            // Parsing Seguro de Escanteios
             decimal avgCorners = 9.5m;
-            try
+            if (res.TryGetProperty("corners", out var cornersNode))
             {
-                if (res.TryGetProperty("corners", out var cornersNode))
-                {
-                    string cStr = cornersNode.GetProperty("average").GetProperty("total").GetString() ?? "9.5";
-                    avgCorners = decimal.Parse(cStr, CultureInfo.InvariantCulture);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError($"Erro na requisição: {ex.Message}");
-                return null;
+                var avgCornersNode = cornersNode.GetProperty("average");
+                string cStr = avgCornersNode.GetProperty("total").GetString() ?? "9.5";
+                avgCorners = decimal.Parse(cStr, CultureInfo.InvariantCulture);
             }
 
             return new InternalTeamStats { AvgGoals = avgGoals, AvgCorners = avgCorners };
@@ -252,8 +259,7 @@ namespace OddsScanner.Worker
 
             foreach (var c in unicode)
             {
-                var unicodeCategory = CharUnicodeInfo.GetUnicodeCategory(c);
-                if (unicodeCategory != UnicodeCategory.NonSpacingMark)
+                if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
                     stringBuilder.Append(c);
             }
 

@@ -29,7 +29,11 @@ const LOGO_MAP: Record<string, string> = {
 };
 
 
-export function getTeamLogoUrl(teamName: string): string | null {
+export function getTeamLogoUrl(teamName: string, apiLogoUrl?: string | null): string | null {
+  if (apiLogoUrl && apiLogoUrl.trim() !== "") {
+    return apiLogoUrl;
+  }
+
   if (LOGO_MAP[teamName]) return LOGO_MAP[teamName];
 
   const normalized = teamName.normalize("NFD").replace(/[\u0300-\u036f]/g, "");

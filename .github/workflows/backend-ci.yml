@@ -4,7 +4,7 @@ on:
   push:
     branches: [ "main" ]
     paths:
-      - 'src/backend/**'  # Só roda se mexer na pasta do backend
+      - 'src/backend/**' 
   pull_request:
     branches: [ "main" ]
     paths:
@@ -14,7 +14,6 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     
-    # Define o diretório de trabalho padrão para evitar "cd src/backend" em todo passo
     defaults:
       run:
         working-directory: ./src/backend
@@ -31,7 +30,6 @@ jobs:
       run: dotnet restore OddsScanner.sln
 
     - name: Build
-      # --no-restore agiliza pois já restauramos acima
       run: dotnet build OddsScanner.sln --no-restore --configuration Release
 
     - name: Test

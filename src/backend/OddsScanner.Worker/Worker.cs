@@ -76,6 +76,8 @@ public class Worker : BackgroundService
                         league: extMatch.League
                     );
 
+                    await _footballApiClient.EnrichMatchStatsAsync(matchEntity);
+
                     if (existingMatch == null)
                     {
                         await unitOfWork.Matches.AddAsync(matchEntity);

@@ -231,17 +231,18 @@ export default function MatchCard({ match }: MatchCardProps) {
           </div>
 
           <div className="p-6">
-            {selectedOdd && (
-              <OddHistoryChart
-                history={selectedOdd.history || []}
-                bookmakerName={selectedOdd.bookmakerName}
-                selection={
-                  selectedOdd.selection === "Home" ? match.homeTeam :
-                  selectedOdd.selection === "Draw" ? "Empate" :
-                  match.awayTeam
-                }
-              />
-            )}
+           {selectedOdd && (
+            <OddHistoryChart
+              history={selectedOdd.history || []}
+              bookmakerName={selectedOdd.bookmakerName}
+              selection={
+                selectedOdd.selection === "Home" ? match.homeTeam :
+                selectedOdd.selection === "Draw" ? "Empate" :
+                match.awayTeam
+              }
+              currentValue={selectedOdd.value}
+            />
+          )}
           </div>
         </DialogContent>
       </Dialog>

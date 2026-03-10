@@ -3,9 +3,9 @@ services:
     image: postgres:16-alpine
     container_name: oddsscanner-db
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: adminpassword
-      POSTGRES_DB: oddsscanner_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
@@ -36,8 +36,8 @@ services:
     ports:
       - "5000:8080"
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=oddsscanner_db;Username=admin;Password=adminpassword;
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};
       - ConnectionStrings__Redis=redis:6379
     depends_on:
       postgres:
@@ -53,8 +53,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - API_URL_INTERNAL=http://backend:8080
-      - NEXT_PUBLIC_API_URL=http://localhost:5000
+      - API_URL_INTERNAL=${API_URL_INTERNAL}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     depends_on:
       - backend
 

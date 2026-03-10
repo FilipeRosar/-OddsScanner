@@ -117,7 +117,7 @@ namespace OddsScanner.Worker
                 }
 
                 // 2. Mapear Times e Logos das ligas principais
-                int[] activeLeagues = { 39, 71, 140, 135, 78, 61, 94 };
+                int[] activeLeagues = { 39, 71, 72, 140, 135, 78, 61, 94, 2, 3, 13 };
                 foreach (var leagueId in activeLeagues)
                 {
                     var teamsJson = await SendRequestAsync($"teams?league={leagueId}&season={DateTime.Now.Year}");

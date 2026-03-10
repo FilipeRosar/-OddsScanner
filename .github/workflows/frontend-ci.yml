@@ -4,7 +4,7 @@ on:
   push:
     branches: [ "main" ]
     paths:
-      - 'src/frontend/**' # Só roda se mexer na pasta do frontend
+      - 'src/frontend/**'
   pull_request:
     branches: [ "main" ]
     paths:
@@ -29,11 +29,9 @@ jobs:
         cache-dependency-path: src/frontend/package-lock.json
 
     - name: Install dependencies
-      # 'npm ci' é mais rápido e seguro para CI do que 'npm install'
       run: npm ci
 
     - name: Lint
-      # Verifica regras de código (ESLint)
       run: npm run lint
 
     - name: Build

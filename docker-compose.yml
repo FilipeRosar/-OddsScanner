@@ -1,7 +1,4 @@
 services:
-  # -------------------------
-  # INFRAESTRUTURA (DB & CACHE)
-  # -------------------------
   postgres:
     image: postgres:16-alpine
     container_name: oddsscanner-db
@@ -31,9 +28,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # -------------------------
-  # BACKEND (.NET API)
-  # -------------------------
   backend:
     container_name: oddsscanner-api
     build:
@@ -51,9 +45,6 @@ services:
       redis:
         condition: service_healthy
 
-  # -------------------------
-  # FRONTEND (NEXT.JS)
-  # -------------------------
   frontend:
     container_name: oddsscanner-web
     build:
@@ -67,8 +58,5 @@ services:
     depends_on:
       - backend
 
-# -------------------------
-# VOLUMES (A PARTE QUE FALTOU)
-# -------------------------
 volumes:
   postgres_data:
